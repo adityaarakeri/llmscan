@@ -1,4 +1,4 @@
-# LLM Check
+# LLM Scan
 
 > A fast CLI that scans your hardware and tells you which local LLMs will actually run on your machine.
 
