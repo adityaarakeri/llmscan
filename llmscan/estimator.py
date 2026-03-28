@@ -28,6 +28,7 @@ def load_catalog(path: str | None = None) -> list[dict[str, Any]]:
     # Use PurePosixPath to ensure Unix-style paths are caught on all platforms (including Windows)
     _sensitive_prefixes = ("/etc", "/private/etc", "/proc", "/sys", "/dev", "/var/run")
     from pathlib import PurePosixPath
+
     posix_str = str(PurePosixPath(path))
     catalog_path = Path(path).resolve()
     resolved_str = str(catalog_path)
