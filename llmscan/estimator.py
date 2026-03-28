@@ -22,14 +22,16 @@ def load_catalog(path: str | None = None) -> list[dict[str, Any]]:
         for m in load_user_catalog():
             merged[m["id"]] = dict(m)
         return list(merged.values())
-    catalog_path = Path(path).resolve()
-    if not catalog_path.suffix == ".json":
+    if not path.endswith(".json"):
         raise SystemExit(f"Error: catalog file must have a .json extension: {path}")
     # Reject paths that try to escape via symlinks or traversal to sensitive locations
+    # Use PurePosixPath to ensure Unix-style paths are caught on all platforms (including Windows)
     _sensitive_prefixes = ("/etc", "/private/etc", "/proc", "/sys", "/dev", "/var/run")
-    raw_str = str(Path(path))
+    from pathlib import PurePosixPath
+    posix_str = str(PurePosixPath(path))
+    catalog_path = Path(path).resolve()
     resolved_str = str(catalog_path)
-    if any(raw_str.startswith(p) or resolved_str.startswith(p) for p in _sensitive_prefixes):
+    if any(posix_str.startswith(p) or resolved_str.startswith(p) for p in _sensitive_prefixes):
         raise SystemExit(f"Error: catalog path is not allowed: {path}")
     try:
         size = catalog_path.stat().st_size
