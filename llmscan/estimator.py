@@ -26,8 +26,10 @@ def load_catalog(path: str | None = None) -> list[dict[str, Any]]:
     if not catalog_path.suffix == ".json":
         raise SystemExit(f"Error: catalog file must have a .json extension: {path}")
     # Reject paths that try to escape via symlinks or traversal to sensitive locations
-    _sensitive_prefixes = ("/etc", "/proc", "/sys", "/dev", "/var/run")
-    if any(str(catalog_path).startswith(p) for p in _sensitive_prefixes):
+    _sensitive_prefixes = ("/etc", "/private/etc", "/proc", "/sys", "/dev", "/var/run")
+    raw_str = str(Path(path))
+    resolved_str = str(catalog_path)
+    if any(raw_str.startswith(p) or resolved_str.startswith(p) for p in _sensitive_prefixes):
         raise SystemExit(f"Error: catalog path is not allowed: {path}")
     try:
         size = catalog_path.stat().st_size
