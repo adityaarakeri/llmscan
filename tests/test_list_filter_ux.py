@@ -14,13 +14,19 @@ runner = CliRunner()
 
 # A very weak machine — most models will be rated "no"
 WEAK_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Celeron", ram_gb=4,
+    os="Linux",
+    arch="x86_64",
+    cpu="Celeron",
+    ram_gb=4,
     gpus=[GPUInfo(vendor="NVIDIA", name="GT 730", vram_gb=1.0, source="nvidia-smi")],
 )
 
 # A strong machine — most models will be rated "great"
 STRONG_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=128,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=128,
     gpus=[GPUInfo(vendor="NVIDIA", name="H100", vram_gb=80.0, source="nvidia-smi")],
 )
 
@@ -48,6 +54,7 @@ class TestHiddenModelsSummaryFooter:
         assert result.exit_code == 0
         # There should be a positive number mentioned alongside "hidden"
         import re
+
         assert re.search(r"\d+", result.output), "Expected a number in the footer"
 
     def test_footer_mentions_min_rating_no_flag(self):
@@ -68,12 +75,29 @@ class TestHiddenModelsSummaryFooter:
     def test_no_footer_when_nothing_hidden(self, tmp_path, monkeypatch):
         """When every model in the catalog passes the filter, no footer is shown."""
         import json as _json
+
         # A tiny catalog where every model easily fits the STRONG_PROFILE
         tiny_catalog = [
-            {"id": "tiny-1b", "family": "Test", "params_b": 1, "quant": "Q4_K_M",
-             "min_vram_gb": 0.5, "recommended_vram_gb": 1.0, "recommended_ram_gb": 2.0, "notes": ""},
-            {"id": "small-3b", "family": "Test", "params_b": 3, "quant": "Q4_K_M",
-             "min_vram_gb": 1.0, "recommended_vram_gb": 2.0, "recommended_ram_gb": 4.0, "notes": ""},
+            {
+                "id": "tiny-1b",
+                "family": "Test",
+                "params_b": 1,
+                "quant": "Q4_K_M",
+                "min_vram_gb": 0.5,
+                "recommended_vram_gb": 1.0,
+                "recommended_ram_gb": 2.0,
+                "notes": "",
+            },
+            {
+                "id": "small-3b",
+                "family": "Test",
+                "params_b": 3,
+                "quant": "Q4_K_M",
+                "min_vram_gb": 1.0,
+                "recommended_vram_gb": 2.0,
+                "recommended_ram_gb": 4.0,
+                "notes": "",
+            },
         ]
         cat_path = tmp_path / "catalog.json"
         cat_path.write_text(_json.dumps(tiny_catalog), encoding="utf-8")

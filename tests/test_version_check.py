@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from llmscan import __version__
@@ -77,6 +76,7 @@ class TestVersionCheckNetworkFailure:
     def test_network_error_exits_zero(self):
         """A network failure during --check exits 0 with a warning, not a crash."""
         import httpx
+
         with patch("httpx.get", side_effect=httpx.ConnectError("refused")):
             result = runner.invoke(app, ["version", "--check"])
         assert result.exit_code == 0
@@ -84,6 +84,7 @@ class TestVersionCheckNetworkFailure:
     def test_network_error_shows_warning_not_traceback(self):
         """Network failure during --check prints a human-friendly warning."""
         import httpx
+
         with patch("httpx.get", side_effect=httpx.ConnectError("refused")):
             result = runner.invoke(app, ["version", "--check"])
         assert "Traceback" not in result.output
@@ -92,6 +93,7 @@ class TestVersionCheckNetworkFailure:
     def test_timeout_is_handled_gracefully(self):
         """A timeout during --check is handled without crashing."""
         import httpx
+
         with patch("httpx.get", side_effect=httpx.TimeoutException("timed out")):
             result = runner.invoke(app, ["version", "--check"])
         assert result.exit_code == 0

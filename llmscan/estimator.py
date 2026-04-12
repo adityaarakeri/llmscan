@@ -19,9 +19,9 @@ RATING_ORDER = {"great": 4, "ok": 3, "tight": 2, "no": 1}
 # Applied to model VRAM/RAM thresholds before scoring so that backend-specific
 # context-window and framework overhead are accounted for.
 _BACKEND_MULTIPLIERS: dict[str, dict[str, float]] = {
-    "llama-cpp": {"vram": 1.0, "ram": 1.0},   # baseline — estimates calibrated for this
-    "ollama":    {"vram": 1.15, "ram": 1.1},   # 15% VRAM / 10% RAM for context window + serving overhead
-    "mlx":       {"vram": 1.1,  "ram": 1.0},   # 10% VRAM for MLX framework overhead on Apple Silicon
+    "llama-cpp": {"vram": 1.0, "ram": 1.0},  # baseline — estimates calibrated for this
+    "ollama": {"vram": 1.15, "ram": 1.1},  # 15% VRAM / 10% RAM for context window + serving overhead
+    "mlx": {"vram": 1.1, "ram": 1.0},  # 10% VRAM for MLX framework overhead on Apple Silicon
 }
 VALID_BACKENDS = frozenset(_BACKEND_MULTIPLIERS)
 
@@ -113,10 +113,7 @@ def _score_model(profile: MachineProfile, model: dict[str, Any]) -> tuple[str, s
         best_gpu < min_vram and system_ram >= rec_ram * 1.5
     ):
         rating = "tight"
-        if best_gpu >= min_vram * 0.7 and system_ram >= rec_ram:
-            reason_code = "partial offload"
-        else:
-            reason_code = "cpu offload"
+        reason_code = "partial offload" if best_gpu >= min_vram * 0.7 and system_ram >= rec_ram else "cpu offload"
         notes.append("Likely needs CPU offload or reduced context")
         notes.append("Expect slower tokens/sec")
     else:

@@ -6,10 +6,18 @@ from llmscan.vram import BITS_PER_WEIGHT, estimate_vram
 
 # All IQ quant types that should be supported
 _IQ_QUANTS = [
-    "IQ1_S", "IQ1_M",
-    "IQ2_XXS", "IQ2_XS", "IQ2_S", "IQ2_M",
-    "IQ3_XXS", "IQ3_XS", "IQ3_S", "IQ3_M",
-    "IQ4_XS", "IQ4_NL",
+    "IQ1_S",
+    "IQ1_M",
+    "IQ2_XXS",
+    "IQ2_XS",
+    "IQ2_S",
+    "IQ2_M",
+    "IQ3_XXS",
+    "IQ3_XS",
+    "IQ3_S",
+    "IQ3_M",
+    "IQ4_XS",
+    "IQ4_NL",
 ]
 
 # Expected bits-per-weight ordering constraints (lower quant = fewer bits)
@@ -27,18 +35,18 @@ _BPW_ORDER = [
 
 # Approximate expected bpw ranges based on llama.cpp documentation
 _BPW_RANGES = {
-    "IQ1_S":   (1.4, 1.8),
-    "IQ1_M":   (1.7, 2.1),
+    "IQ1_S": (1.4, 1.8),
+    "IQ1_M": (1.7, 2.1),
     "IQ2_XXS": (2.0, 2.3),
-    "IQ2_XS":  (2.2, 2.5),
-    "IQ2_S":   (2.4, 2.7),
-    "IQ2_M":   (2.6, 2.9),
+    "IQ2_XS": (2.2, 2.5),
+    "IQ2_S": (2.4, 2.7),
+    "IQ2_M": (2.6, 2.9),
     "IQ3_XXS": (2.9, 3.3),
-    "IQ3_XS":  (3.2, 3.5),
-    "IQ3_S":   (3.4, 3.7),
-    "IQ3_M":   (3.4, 3.8),
-    "IQ4_XS":  (4.1, 4.4),
-    "IQ4_NL":  (4.4, 4.6),
+    "IQ3_XS": (3.2, 3.5),
+    "IQ3_S": (3.4, 3.7),
+    "IQ3_M": (3.4, 3.8),
+    "IQ4_XS": (4.1, 4.4),
+    "IQ4_NL": (4.4, 4.6),
 }
 
 
@@ -80,8 +88,19 @@ class TestIqQuantBitsPerWeightValues:
     def test_all_iq_quants_below_q4_0(self):
         """IQ quants below IQ4 should use fewer bits than Q4_0 (4.5 bpw)."""
         q4_bpw = BITS_PER_WEIGHT["Q4_0"]
-        for quant in ["IQ1_S", "IQ1_M", "IQ2_XXS", "IQ2_XS", "IQ2_S", "IQ2_M",
-                      "IQ3_XXS", "IQ3_XS", "IQ3_S", "IQ3_M", "IQ4_XS"]:
+        for quant in [
+            "IQ1_S",
+            "IQ1_M",
+            "IQ2_XXS",
+            "IQ2_XS",
+            "IQ2_S",
+            "IQ2_M",
+            "IQ3_XXS",
+            "IQ3_XS",
+            "IQ3_S",
+            "IQ3_M",
+            "IQ4_XS",
+        ]:
             assert BITS_PER_WEIGHT[quant] < q4_bpw, f"{quant} bpw should be < Q4_0"
 
     def test_iq4_nl_comparable_to_q4(self):

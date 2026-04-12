@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 from typer.testing import CliRunner
 
 from llmscan.cli import app
@@ -11,11 +10,11 @@ from llmscan.cli import app
 runner = CliRunner()
 
 _HF_RESPONSE = [
-    {"modelId": "TheBloke/Llama-2-7B-GGUF",     "downloads": 1000, "likes": 50, "tags": [], "lastModified": ""},
-    {"modelId": "TheBloke/Llama-2-13B-GGUF",    "downloads":  800, "likes": 30, "tags": [], "lastModified": ""},
-    {"modelId": "TheBloke/Llama-2-70B-GGUF",    "downloads":  500, "likes": 20, "tags": [], "lastModified": ""},
-    {"modelId": "TheBloke/Mistral-7B-GGUF",      "downloads":  900, "likes": 40, "tags": [], "lastModified": ""},
-    {"modelId": "someone/NoParamsInName-GGUF",   "downloads":  100, "likes":  5, "tags": [], "lastModified": ""},
+    {"modelId": "TheBloke/Llama-2-7B-GGUF", "downloads": 1000, "likes": 50, "tags": [], "lastModified": ""},
+    {"modelId": "TheBloke/Llama-2-13B-GGUF", "downloads": 800, "likes": 30, "tags": [], "lastModified": ""},
+    {"modelId": "TheBloke/Llama-2-70B-GGUF", "downloads": 500, "likes": 20, "tags": [], "lastModified": ""},
+    {"modelId": "TheBloke/Mistral-7B-GGUF", "downloads": 900, "likes": 40, "tags": [], "lastModified": ""},
+    {"modelId": "someone/NoParamsInName-GGUF", "downloads": 100, "likes": 5, "tags": [], "lastModified": ""},
 ]
 
 

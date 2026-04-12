@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
@@ -14,7 +13,10 @@ from llmscan.huggingface import HFFileInfo
 runner = CliRunner()
 
 FAKE_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Test CPU", ram_gb=32,
+    os="Linux",
+    arch="x86_64",
+    cpu="Test CPU",
+    ram_gb=32,
     gpus=[GPUInfo(vendor="NVIDIA", name="RTX 4090", vram_gb=24.0, source="nvidia-smi")],
 )
 
@@ -126,9 +128,7 @@ class TestAddDryRunJson:
         monkeypatch.setattr("llmscan.cli.load_user_catalog", lambda: [])
         monkeypatch.setattr("llmscan.cli.save_user_catalog", lambda e: None)
 
-        result = runner.invoke(
-            app, ["add", "my-model", "--params-b", "7", "--quant", "Q4_K_M", "--json", "--dry-run"]
-        )
+        result = runner.invoke(app, ["add", "my-model", "--params-b", "7", "--quant", "Q4_K_M", "--json", "--dry-run"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -149,9 +149,7 @@ class TestAddDryRunJson:
         monkeypatch.setattr("llmscan.cli.load_user_catalog", lambda: [])
         monkeypatch.setattr("llmscan.cli.save_user_catalog", lambda e: None)
 
-        result = runner.invoke(
-            app, ["add", "my-model", "--params-b", "7", "--quant", "Q4_K_M", "--json", "--dry-run"]
-        )
+        result = runner.invoke(app, ["add", "my-model", "--params-b", "7", "--quant", "Q4_K_M", "--json", "--dry-run"])
 
         assert result.exit_code == 0
         data = json.loads(result.output)
@@ -184,10 +182,18 @@ class TestAddDryRunValidation:
 
     def test_dry_run_with_duplicate_does_not_warn_about_force(self, monkeypatch):
         """--dry-run bypasses the duplicate-model check (it's not writing anyway)."""
-        existing = [{
-            "id": "my-model", "family": "X", "params_b": 7, "quant": "Q4_K_M",
-            "min_vram_gb": 4, "recommended_vram_gb": 5, "recommended_ram_gb": 8, "notes": "",
-        }]
+        existing = [
+            {
+                "id": "my-model",
+                "family": "X",
+                "params_b": 7,
+                "quant": "Q4_K_M",
+                "min_vram_gb": 4,
+                "recommended_vram_gb": 5,
+                "recommended_ram_gb": 8,
+                "notes": "",
+            }
+        ]
         monkeypatch.setattr("llmscan.cli.load_user_catalog", lambda: list(existing))
         monkeypatch.setattr("llmscan.cli.save_user_catalog", lambda e: None)
 

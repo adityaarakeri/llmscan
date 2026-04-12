@@ -20,7 +20,13 @@ from . import __version__
 from .catalog import load_user_catalog, save_user_catalog
 from .detector import MachineProfile, detect_machine, profile_json
 from .estimator import RATING_ORDER, VALID_BACKENDS, evaluate_models, load_catalog
-from .huggingface import HuggingFaceError, get_model_files, infer_params_from_name, parse_gguf_filename, search_gguf_models
+from .huggingface import (
+    HuggingFaceError,
+    get_model_files,
+    infer_params_from_name,
+    parse_gguf_filename,
+    search_gguf_models,
+)
 from .vram import BITS_PER_WEIGHT, build_model_entry, estimate_vram
 
 _MODEL_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -132,7 +138,9 @@ def main(
     version: bool = typer.Option(
         False, "--version", "-V", callback=_version_callback, is_eager=True, help="Show version and exit."
     ),
-    no_color: bool = typer.Option(False, "--no-color", help="Disable color and Rich formatting (for CI / log capture)."),
+    no_color: bool = typer.Option(
+        False, "--no-color", help="Disable color and Rich formatting (for CI / log capture)."
+    ),
     plain: bool = typer.Option(False, "--plain", help="Alias for --no-color."),
 ) -> None:
     global console
@@ -152,7 +160,9 @@ def main(
         )
     )
     console.print(Rule(style="bright_black"))
-    list_models(min_rating="ok", catalog=None, json_output=False, family=None, sort="rating", running=False, backend="llama-cpp")
+    list_models(
+        min_rating="ok", catalog=None, json_output=False, family=None, sort="rating", running=False, backend="llama-cpp"
+    )
     console.print(
         "\n[dim]Try:[/dim]\n"
         "  [bold]llmscan scan[/bold]\n"
@@ -227,7 +237,9 @@ def list_models(
     family: str | None = typer.Option(None, "--family", help="Filter by family name (case-insensitive substring)."),
     sort: str = typer.Option("rating", "--sort", help="Sort by: rating (default), params, vram, name."),
     running: bool = typer.Option(False, "--running", help="Cross-reference with Ollama running models."),
-    backend: str = typer.Option("llama-cpp", "--backend", help="Inference backend for scoring: llama-cpp (default), ollama, mlx."),
+    backend: str = typer.Option(
+        "llama-cpp", "--backend", help="Inference backend for scoring: llama-cpp (default), ollama, mlx."
+    ),
     csv_output: bool = typer.Option(False, "--csv", help="Print model results as CSV (spreadsheet-friendly)."),
 ) -> None:
     """List compatible models for this machine."""
@@ -271,8 +283,18 @@ def list_models(
         return
 
     if csv_output:
-        _CSV_COLUMNS = ["id", "family", "params_b", "quant", "rating", "reason_code",
-                        "min_vram_gb", "recommended_vram_gb", "recommended_ram_gb", "fit_notes"]
+        _CSV_COLUMNS = [
+            "id",
+            "family",
+            "params_b",
+            "quant",
+            "rating",
+            "reason_code",
+            "min_vram_gb",
+            "recommended_vram_gb",
+            "recommended_ram_gb",
+            "fit_notes",
+        ]
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=_CSV_COLUMNS, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
@@ -319,7 +341,7 @@ def list_models(
     if hidden_count > 0:
         console.print(
             f"[dim]+{hidden_count} model{'s' if hidden_count != 1 else ''} hidden "
-            f"(rated \"no\" — insufficient hardware). "
+            f'(rated "no" — insufficient hardware). '
             f"Run with [bold]--min-rating no[/bold] to show all.[/dim]"
         )
 
@@ -375,7 +397,9 @@ def search(
     limit: int = typer.Option(20, help="Maximum number of results."),
     json_output: bool = typer.Option(False, "--json", help="Print results as JSON."),
     min_params: float | None = typer.Option(None, "--min-params", help="Minimum parameter count in billions (e.g. 7)."),
-    max_params: float | None = typer.Option(None, "--max-params", help="Maximum parameter count in billions (e.g. 70)."),
+    max_params: float | None = typer.Option(
+        None, "--max-params", help="Maximum parameter count in billions (e.g. 70)."
+    ),
 ) -> None:
     """Search Hugging Face for GGUF models."""
     if not 1 <= limit <= 100:
@@ -617,9 +641,7 @@ def _fetch_remote_catalog(url: str) -> list[dict]:
     return entries
 
 
-def _compute_diff(
-    remote: list[dict], bundled: list[dict]
-) -> tuple[list[str], list[str], list[str]]:
+def _compute_diff(remote: list[dict], bundled: list[dict]) -> tuple[list[str], list[str], list[str]]:
     """Return (new_ids, updated_ids, removed_ids) comparing remote against bundled catalog."""
     bundled_by_id = {m["id"]: m for m in bundled}
     remote_ids = {m["id"] for m in remote}
@@ -711,10 +733,13 @@ def doctor(
     anomalies: list[str] = []
     for gpu in profile.gpus:
         if gpu.vram_gb == 0.0:
-            anomalies.append(f"GPU '{gpu.name}' detected via {gpu.source} but VRAM reported as 0 GB — driver or query issue.")
+            anomalies.append(
+                f"GPU '{gpu.name}' detected via {gpu.source} but VRAM reported as 0 GB — driver or query issue."
+            )
 
     if json_output:
-        console.print_json(json.dumps({"tools": tool_results, "anomalies": anomalies, "gpus": [g.__dict__ for g in profile.gpus]}, indent=2))
+        data = {"tools": tool_results, "anomalies": anomalies, "gpus": [g.__dict__ for g in profile.gpus]}
+        console.print_json(json.dumps(data, indent=2))
         return
 
     table = Table(box=box.SIMPLE_HEAVY, header_style="bold", title="Detection Tools")
@@ -722,10 +747,7 @@ def doctor(
     table.add_column("Status", justify="center")
     table.add_column("Path", style="dim")
     for tool, info in tool_results.items():
-        if info["available"]:
-            status = "[bold green]found[/bold green]"
-        else:
-            status = "[bold red]missing[/bold red]"
+        status = "[bold green]found[/bold green]" if info["available"] else "[bold red]missing[/bold red]"
         table.add_row(tool, status, info["path"] or "—")
     console.print(Panel(table, title="[bold]llmscan doctor[/bold]", border_style="cyan", padding=(0, 1)))
 

@@ -17,7 +17,10 @@ runner = CliRunner()
 
 # Machine with exactly 6.0 GB GPU — at the rec_vram threshold for our test model
 EXACT_FIT = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=12.0,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=12.0,
     gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=6.0, source="nvidia-smi")],
 )
 
@@ -114,6 +117,7 @@ class TestBackendScoringDifference:
         data_llama = json.loads(r_llama.output)
         data_ollama = json.loads(r_ollama.output)
         from llmscan.estimator import RATING_ORDER
+
         m_llama = next(m for m in data_llama["models"] if m["id"] == "test-6b")
         m_ollama = next(m for m in data_ollama["models"] if m["id"] == "test-6b")
         assert RATING_ORDER[m_ollama["rating"]] < RATING_ORDER[m_llama["rating"]]
@@ -175,6 +179,7 @@ class TestEvaluateModelsBackendParam:
     def test_evaluate_models_ollama_scores_lower_than_llama_cpp(self):
         """evaluate_models with ollama backend scores lower than llama-cpp for exact-fit model."""
         from llmscan.estimator import RATING_ORDER
+
         rows_llama = evaluate_models(EXACT_FIT, _CATALOG, backend="llama-cpp")
         rows_ollama = evaluate_models(EXACT_FIT, _CATALOG, backend="ollama")
         assert RATING_ORDER[rows_ollama[0]["rating"]] < RATING_ORDER[rows_llama[0]["rating"]]

@@ -13,8 +13,14 @@ from llmscan.cli import app
 runner = CliRunner()
 
 _NEW_MODEL = {
-    "id": "new-remote-diff-99b", "family": "Test", "params_b": 99, "quant": "Q4_K_M",
-    "min_vram_gb": 50.0, "recommended_vram_gb": 65.0, "recommended_ram_gb": 100.0, "notes": "",
+    "id": "new-remote-diff-99b",
+    "family": "Test",
+    "params_b": 99,
+    "quant": "Q4_K_M",
+    "min_vram_gb": 50.0,
+    "recommended_vram_gb": 65.0,
+    "recommended_ram_gb": 100.0,
+    "notes": "",
 }
 _UPDATED_MODEL = {**DEFAULT_MODELS[0], "notes": "Updated in remote."}
 

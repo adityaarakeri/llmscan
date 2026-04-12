@@ -13,15 +13,34 @@ from llmscan.detector import GPUInfo, MachineProfile
 runner = CliRunner()
 
 STRONG = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=128,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=128,
     gpus=[GPUInfo(vendor="NVIDIA", name="H100", vram_gb=80.0, source="nvidia-smi")],
 )
 
 _CATALOG = [
-    {"id": "llama-3.1-8b-instruct", "family": "Llama", "params_b": 8, "quant": "Q4_K_M",
-     "min_vram_gb": 5.0, "recommended_vram_gb": 6.0, "recommended_ram_gb": 10.0, "notes": ""},
-    {"id": "mistral-7b", "family": "Mistral", "params_b": 7, "quant": "Q4_K_M",
-     "min_vram_gb": 4.5, "recommended_vram_gb": 5.5, "recommended_ram_gb": 9.0, "notes": ""},
+    {
+        "id": "llama-3.1-8b-instruct",
+        "family": "Llama",
+        "params_b": 8,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 5.0,
+        "recommended_vram_gb": 6.0,
+        "recommended_ram_gb": 10.0,
+        "notes": "",
+    },
+    {
+        "id": "mistral-7b",
+        "family": "Mistral",
+        "params_b": 7,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 4.5,
+        "recommended_vram_gb": 5.5,
+        "recommended_ram_gb": 9.0,
+        "notes": "",
+    },
 ]
 
 # Ollama /api/tags response — llama is running, mistral is not
@@ -42,7 +61,10 @@ def _mock_ollama_resp(data=_OLLAMA_TAGS, status=200):
 
 
 def _invoke(args, catalog=_CATALOG):
-    import json as _j, tempfile, os
+    import json as _j
+    import os
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         _j.dump(catalog, f)
         name = f.name
@@ -71,6 +93,7 @@ class TestRunningFlagAccepted:
     def test_running_flag_accepted_when_ollama_down(self):
         """--running exits 0 and warns when Ollama is not reachable."""
         import httpx
+
         with patch("httpx.get", side_effect=httpx.ConnectError("refused")):
             result = _invoke(["list", "--running"])
         assert result.exit_code == 0
@@ -78,6 +101,7 @@ class TestRunningFlagAccepted:
     def test_running_flag_shows_warning_when_ollama_down(self):
         """When Ollama is not reachable, output warns the user."""
         import httpx
+
         with patch("httpx.get", side_effect=httpx.ConnectError("refused")):
             result = _invoke(["list", "--running"])
         assert "ollama" in result.output.lower()
