@@ -50,3 +50,69 @@ jobs:
       - run: uv python install 3.12
       - run: uv build
       - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # release/v1
+
+  update-homebrew:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version and fetch PyPI metadata
+        id: pypi
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # PyPI publish can take a moment — retry up to 10 times
+          for i in $(seq 1 10); do
+            RESP=$(curl -sf "https://pypi.org/pypi/llmscan/$VERSION/json") && break
+            echo "Waiting for PyPI... attempt $i"
+            sleep 15
+          done
+
+          export RESP
+          python3 - <<'EOF'
+          import json, os, sys
+          data = json.loads(os.environ["RESP"])
+          for f in data["urls"]:
+              if f["filename"].endswith(".tar.gz"):
+                  with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+                      fh.write(f"url={f['url']}\n")
+                      fh.write(f"sha256={f['digests']['sha256']}\n")
+                  sys.exit(0)
+          sys.exit(1)
+          EOF
+
+      - name: Checkout homebrew tap
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: adityaarakeri/homebrew-llmscan
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-llmscan
+
+      - name: Patch formula
+        run: |
+          python3 - "${{ steps.pypi.outputs.url }}" "${{ steps.pypi.outputs.sha256 }}" <<'EOF'
+          import re, pathlib, sys
+
+          new_url, new_sha = sys.argv[1], sys.argv[2]
+          p = pathlib.Path("homebrew-llmscan/Formula/llmscan.rb")
+          text = p.read_text()
+
+          # Top-level url/sha256 use 2-space indent; resource blocks use 4-space — safe to target count=1
+          text = re.sub(r'^  url "https://files\.pythonhosted\.org/[^"]+"',
+                        f'  url "{new_url}"', text, count=1, flags=re.MULTILINE)
+          text = re.sub(r'^  sha256 "[a-f0-9]+"',
+                        f'  sha256 "{new_sha}"', text, count=1, flags=re.MULTILINE)
+
+          p.write_text(text)
+          print(f"Updated formula to {new_url}")
+          EOF
+
+      - name: Commit and push
+        run: |
+          cd homebrew-llmscan
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/llmscan.rb
+          git diff --cached --quiet || git commit -m "llmscan ${{ steps.pypi.outputs.version }}"
+          git push

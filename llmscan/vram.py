@@ -6,8 +6,20 @@ from typing import Any
 # Approximate bits per weight for common GGUF quantization types.
 # Sources: llama.cpp quantization docs, empirical measurements.
 BITS_PER_WEIGHT: dict[str, float] = {
-    "IQ2_XS": 2.3,
-    "IQ3_XS": 3.3,
+    # iMatrix quantization tiers (IQ) — sorted low to high quality
+    "IQ1_S":   1.6,
+    "IQ1_M":   1.8,
+    "IQ2_XXS": 2.1,
+    "IQ2_XS":  2.3,
+    "IQ2_S":   2.5,
+    "IQ2_M":   2.7,
+    "IQ3_XXS": 3.1,
+    "IQ3_XS":  3.3,
+    "IQ3_S":   3.5,
+    "IQ3_M":   3.6,
+    "IQ4_XS":  4.25,
+    "IQ4_NL":  4.5,
+    # Standard k-quants
     "Q2_K": 3.3,
     "Q3_K_S": 3.7,
     "Q3_K_M": 3.9,

@@ -14,6 +14,7 @@ from llmscan.detector import (
     _detect_nvidia,
     _detect_ram_gb,
     _detect_windows_gpu,
+    _detect_wsl2,
     _run,
     detect_machine,
 )
@@ -471,3 +472,98 @@ class TestRunHelper:
             result = _run(["nvidia-smi"])
         assert result is None
         assert "denied" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# WSL2 detection
+# ---------------------------------------------------------------------------
+
+
+class TestDetectWsl2:
+    @patch("llmscan.detector.platform.system", return_value="Windows")
+    def test_non_linux_returns_false(self, mock_sys):
+        assert _detect_wsl2() is False
+
+    @patch("llmscan.detector.platform.system", return_value="Darwin")
+    def test_macos_returns_false(self, mock_sys):
+        assert _detect_wsl2() is False
+
+    @patch("llmscan.detector.platform.system", return_value="Linux")
+    def test_linux_with_microsoft_in_proc_version(self, mock_sys):
+        with patch("pathlib.Path.read_text", return_value="Linux version 5.15.90.1-microsoft-standard-WSL2"):
+            assert _detect_wsl2() is True
+
+    @patch("llmscan.detector.platform.system", return_value="Linux")
+    def test_linux_with_wsl_in_proc_version(self, mock_sys):
+        with patch("pathlib.Path.read_text", return_value="Linux version 5.15.0 (wsl2-build)"):
+            assert _detect_wsl2() is True
+
+    @patch("llmscan.detector.platform.system", return_value="Linux")
+    def test_native_linux_returns_false(self, mock_sys):
+        with patch("pathlib.Path.read_text", return_value="Linux version 6.1.0-debian #1 SMP x86_64 GNU/Linux"):
+            assert _detect_wsl2() is False
+
+    @patch("llmscan.detector.platform.system", return_value="Linux")
+    def test_proc_version_unreadable_returns_false(self, mock_sys):
+        with patch("pathlib.Path.read_text", side_effect=OSError("no such file")):
+            assert _detect_wsl2() is False
+
+    @patch("llmscan.detector._detect_ram_gb", return_value=16.0)
+    @patch("llmscan.detector._detect_windows_gpu", return_value=[])
+    @patch("llmscan.detector._detect_apple_silicon", return_value=([], None))
+    @patch("llmscan.detector._detect_intel_gpu", return_value=[])
+    @patch("llmscan.detector._detect_amd_rocm", return_value=[])
+    @patch("llmscan.detector._detect_nvidia", return_value=[])
+    @patch("llmscan.detector._detect_wsl2", return_value=True)
+    def test_detect_machine_propagates_wsl2_flag(
+        self, mock_wsl2, mock_nv, mock_amd, mock_intel, mock_apple, mock_win, mock_ram
+    ):
+        profile = detect_machine()
+        assert profile.is_wsl2 is True
+
+
+# ---------------------------------------------------------------------------
+# GPU detection crash resilience (graceful fallback)
+# ---------------------------------------------------------------------------
+
+
+class TestGpuDetectionCrashResilience:
+    @patch("llmscan.detector._detect_ram_gb", return_value=32.0)
+    @patch("llmscan.detector._detect_windows_gpu", return_value=[])
+    @patch("llmscan.detector._detect_apple_silicon", return_value=([], None))
+    @patch("llmscan.detector._detect_intel_gpu", side_effect=RuntimeError("driver exploded"))
+    @patch("llmscan.detector._detect_amd_rocm", side_effect=RuntimeError("rocm crashed"))
+    @patch("llmscan.detector._detect_nvidia", side_effect=RuntimeError("nvidia dead"))
+    def test_all_gpu_detection_crashes_returns_no_gpu_profile(
+        self, mock_nv, mock_amd, mock_intel, mock_apple, mock_win, mock_ram
+    ):
+        """If every GPU detector raises unexpectedly, detect_machine() still returns a valid profile."""
+        profile = detect_machine()
+        assert isinstance(profile, MachineProfile)
+        assert profile.gpus == []
+        assert profile.ram_gb == 32.0
+
+    @patch("llmscan.detector._detect_ram_gb", return_value=16.0)
+    @patch("llmscan.detector._detect_windows_gpu", return_value=[])
+    @patch("llmscan.detector._detect_apple_silicon", side_effect=RuntimeError("sysctl missing"))
+    @patch("llmscan.detector._detect_intel_gpu", return_value=[])
+    @patch("llmscan.detector._detect_amd_rocm", return_value=[])
+    @patch("llmscan.detector._detect_nvidia", return_value=[])
+    def test_apple_silicon_crash_falls_through_gracefully(
+        self, mock_nv, mock_amd, mock_intel, mock_apple, mock_win, mock_ram
+    ):
+        profile = detect_machine()
+        assert profile.gpus == []
+        assert profile.unified_memory_gb is None
+
+    @patch("llmscan.detector._detect_ram_gb", return_value=8.0)
+    @patch("llmscan.detector._detect_windows_gpu", side_effect=RuntimeError("wmi blew up"))
+    @patch("llmscan.detector._detect_apple_silicon", return_value=([], None))
+    @patch("llmscan.detector._detect_intel_gpu", return_value=[])
+    @patch("llmscan.detector._detect_amd_rocm", return_value=[])
+    @patch("llmscan.detector._detect_nvidia", return_value=[])
+    def test_windows_gpu_crash_falls_through_gracefully(
+        self, mock_nv, mock_amd, mock_intel, mock_apple, mock_win, mock_ram
+    ):
+        profile = detect_machine()
+        assert profile.gpus == []

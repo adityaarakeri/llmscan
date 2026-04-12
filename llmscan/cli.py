@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 
@@ -17,8 +19,8 @@ from rich.text import Text
 from . import __version__
 from .catalog import load_user_catalog, save_user_catalog
 from .detector import MachineProfile, detect_machine, profile_json
-from .estimator import RATING_ORDER, evaluate_models, load_catalog
-from .huggingface import HuggingFaceError, get_model_files, parse_gguf_filename, search_gguf_models
+from .estimator import RATING_ORDER, VALID_BACKENDS, evaluate_models, load_catalog
+from .huggingface import HuggingFaceError, get_model_files, infer_params_from_name, parse_gguf_filename, search_gguf_models
 from .vram import BITS_PER_WEIGHT, build_model_entry, estimate_vram
 
 _MODEL_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
@@ -40,7 +42,7 @@ def _version_callback(value: bool) -> None:
 
 
 app = typer.Typer(
-    add_completion=False, no_args_is_help=False, help="Fast local LLM compatibility checker.", rich_markup_mode="rich"
+    add_completion=True, no_args_is_help=False, help="Fast local LLM compatibility checker.", rich_markup_mode="rich"
 )
 console = Console()
 
@@ -85,23 +87,43 @@ def _render_header() -> None:
 
 def _machine_summary_panel(profile: MachineProfile) -> None:
     primary_vram = max((g.vram_gb for g in profile.gpus), default=0)
+    total_vram = round(sum(g.vram_gb * g.count for g in profile.gpus), 1)
+    multi_gpu = total_vram > primary_vram
     cards = [
         _badge("PRIMARY VRAM", f"{primary_vram} GB", "green" if primary_vram else "yellow"),
         _badge("SYSTEM RAM", f"{profile.ram_gb} GB", "cyan"),
         _badge("ARCH", profile.arch or "unknown", "magenta"),
         _badge("OS", profile.os, "blue"),
     ]
+    if multi_gpu:
+        cards.insert(1, _badge("TOTAL VRAM", f"{total_vram} GB", "green"))
     console.print(Columns(cards, equal=True, expand=True))
 
 
 def _gpu_lines(profile: MachineProfile) -> str:
     if not profile.gpus:
-        return "[yellow]No dedicated GPU detected[/yellow]"
+        return "[yellow]No dedicated GPU detected — scoring based on CPU-only inference[/yellow]"
     lines = []
     for gpu in profile.gpus:
         count = f" x{gpu.count}" if gpu.count > 1 else ""
         lines.append(f"• {gpu.vendor} {gpu.name}{count} — {gpu.vram_gb} GB [dim]({gpu.source})[/dim]")
     return "\n".join(lines)
+
+
+def _warn_wsl2(profile: MachineProfile) -> None:
+    """Print a WSL2 VRAM accuracy warning if running inside WSL2."""
+    if not profile.is_wsl2:
+        return
+    console.print(
+        Panel(
+            "[bold yellow]WSL2 detected.[/bold yellow] "
+            "nvidia-smi VRAM readings may be inaccurate under WSL2. "
+            "Verify GPU memory values on the Windows host with [bold]nvidia-smi[/bold] or [bold]GPU-Z[/bold] "
+            "before trusting these results.",
+            title="[yellow]WSL2 Warning[/yellow]",
+            border_style="yellow",
+        )
+    )
 
 
 @app.callback(invoke_without_command=True)
@@ -110,11 +132,17 @@ def main(
     version: bool = typer.Option(
         False, "--version", "-V", callback=_version_callback, is_eager=True, help="Show version and exit."
     ),
+    no_color: bool = typer.Option(False, "--no-color", help="Disable color and Rich formatting (for CI / log capture)."),
+    plain: bool = typer.Option(False, "--plain", help="Alias for --no-color."),
 ) -> None:
+    global console
+    if no_color or plain:
+        console = Console(no_color=True, highlight=False)
     if ctx.invoked_subcommand:
         return
     _render_header()
     profile = _get_profile()
+    _warn_wsl2(profile)
     _machine_summary_panel(profile)
     console.print(
         Panel(
@@ -124,7 +152,7 @@ def main(
         )
     )
     console.print(Rule(style="bright_black"))
-    list_models(min_rating="ok", catalog=None, json_output=False)
+    list_models(min_rating="ok", catalog=None, json_output=False, family=None, sort="rating", running=False, backend="llama-cpp")
     console.print(
         "\n[dim]Try:[/dim]\n"
         "  [bold]llmscan scan[/bold]\n"
@@ -143,6 +171,7 @@ def scan(json_output: bool = typer.Option(False, "--json", help="Print raw machi
         console.print_json(profile_json(profile))
         return
     _render_header()
+    _warn_wsl2(profile)
     _machine_summary_panel(profile)
     lines = [
         f"[bold]OS[/bold]             {profile.os}",
@@ -153,7 +182,41 @@ def scan(json_output: bool = typer.Option(False, "--json", help="Print raw machi
     if profile.unified_memory_gb:
         lines.append(f"[bold]Unified memory[/bold] {profile.unified_memory_gb} GB")
     lines.append(f"[bold]GPU[/bold]\n{_gpu_lines(profile)}")
+    total_vram = round(sum(g.vram_gb * g.count for g in profile.gpus), 1)
+    primary_vram = max((g.vram_gb for g in profile.gpus), default=0)
+    if total_vram > primary_vram:
+        lines.append(f"[bold]Total VRAM[/bold]     {total_vram} GB (across all GPUs)")
     console.print(Panel("\n".join(lines), title="Machine Profile", border_style="cyan"))
+
+
+_SORT_KEYS = {
+    "rating": lambda r: (RATING_ORDER[r["rating"]], r["params_b"]),
+    "params": lambda r: r["params_b"],
+    "vram": lambda r: r["min_vram_gb"],
+    "name": lambda r: r["id"],
+}
+
+
+_OLLAMA_API = "http://localhost:11434/api/tags"
+
+
+def _fetch_ollama_running() -> set[str] | None:
+    """Return the set of Ollama model name strings, or None if Ollama is unreachable."""
+    import httpx
+
+    try:
+        resp = httpx.get(_OLLAMA_API, timeout=3.0)
+        resp.raise_for_status()
+        data = resp.json()
+        return {m["name"] for m in data.get("models", [])}
+    except Exception:
+        return None
+
+
+def _is_running_in_ollama(model_id: str, ollama_names: set[str]) -> bool:
+    """Return True if model_id appears (case-insensitively) in any Ollama model name."""
+    mid = model_id.lower()
+    return any(mid in name.lower() for name in ollama_names)
 
 
 @app.command("list")
@@ -161,20 +224,64 @@ def list_models(
     min_rating: str = typer.Option("tight", help="Only show models at or above this rating: great, ok, tight, no."),
     catalog: str | None = typer.Option(None, help="Path to custom model catalog JSON."),
     json_output: bool = typer.Option(False, "--json", help="Print model results as JSON."),
+    family: str | None = typer.Option(None, "--family", help="Filter by family name (case-insensitive substring)."),
+    sort: str = typer.Option("rating", "--sort", help="Sort by: rating (default), params, vram, name."),
+    running: bool = typer.Option(False, "--running", help="Cross-reference with Ollama running models."),
+    backend: str = typer.Option("llama-cpp", "--backend", help="Inference backend for scoring: llama-cpp (default), ollama, mlx."),
+    csv_output: bool = typer.Option(False, "--csv", help="Print model results as CSV (spreadsheet-friendly)."),
 ) -> None:
     """List compatible models for this machine."""
     min_rating = min_rating.lower()
     if min_rating not in RATING_ORDER:
         raise typer.BadParameter("min-rating must be one of: great, ok, tight, no")
+    sort = sort.lower()
+    if sort not in _SORT_KEYS:
+        raise typer.BadParameter(f"--sort must be one of: {', '.join(_SORT_KEYS)}")
+    backend = backend.lower()
+    if backend not in VALID_BACKENDS:
+        raise typer.BadParameter(f"--backend must be one of: {', '.join(sorted(VALID_BACKENDS))}")
+    if csv_output and json_output:
+        raise typer.BadParameter("--csv and --json cannot be used together")
 
     profile = _get_profile()
-    rows = evaluate_models(profile, load_catalog(catalog))
+    rows = evaluate_models(profile, load_catalog(catalog), backend=backend)
     threshold = RATING_ORDER[min_rating]
     filtered = [r for r in rows if RATING_ORDER[r["rating"]] >= threshold]
 
+    if family:
+        filtered = [r for r in filtered if family.lower() in r["family"].lower()]
+
+    reverse = sort != "name"
+    filtered = sorted(filtered, key=_SORT_KEYS[sort], reverse=reverse)
+
+    hidden_count = len(rows) - len([r for r in rows if RATING_ORDER[r["rating"]] >= threshold])
+
+    ollama_names: set[str] | None = None
+    ollama_unavailable = False
+    if running:
+        ollama_names = _fetch_ollama_running()
+        if ollama_names is None:
+            ollama_unavailable = True
+            ollama_names = set()
+        for row in filtered:
+            row["running"] = _is_running_in_ollama(row["id"], ollama_names)
+
     if json_output:
-        console.print_json(json.dumps({"machine": profile.to_dict(), "models": filtered}, indent=2))
+        console.print_json(json.dumps({"machine": profile.to_dict(), "backend": backend, "models": filtered}, indent=2))
         return
+
+    if csv_output:
+        _CSV_COLUMNS = ["id", "family", "params_b", "quant", "rating", "reason_code",
+                        "min_vram_gb", "recommended_vram_gb", "recommended_ram_gb", "fit_notes"]
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=_CSV_COLUMNS, extrasaction="ignore", lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(filtered)
+        typer.echo(buf.getvalue(), nl=False)
+        return
+
+    if running and ollama_unavailable:
+        console.print("[yellow]Ollama not reachable at localhost:11434 — running status unavailable.[/yellow]")
 
     table = Table(box=box.SIMPLE_HEAVY, header_style="bold")
     table.add_column("Model", style="bold white")
@@ -185,20 +292,36 @@ def list_models(
     table.add_column("Rec VRAM", justify="right")
     table.add_column("Rec RAM", justify="right")
     table.add_column("Notes", overflow="fold")
+    if running:
+        table.add_column("Running", justify="center")
 
     for row in filtered:
-        table.add_row(
+        reason = row.get("reason_code", "")
+        fit_cell = f"[{_rating_style(row['rating'])}]{row['rating']}[/]"
+        if reason:
+            fit_cell += f" [dim]({escape(reason)})[/dim]"
+        cells = [
             escape(row["id"]),
             escape(row["family"]),
             f"{row['params_b']}B",
-            f"[{_rating_style(row['rating'])}]{row['rating']}[/]",
+            fit_cell,
             f"{row['min_vram_gb']} GB",
             f"{row['recommended_vram_gb']} GB",
             f"{row['recommended_ram_gb']} GB",
             escape(row["fit_notes"]),
-        )
+        ]
+        if running:
+            cells.append("[bold green]●[/bold green]" if row.get("running") else "[dim]—[/dim]")
+        table.add_row(*cells)
 
     console.print(Panel(table, title=f"Model Fit Matrix • showing {min_rating}+", border_style="green", padding=(0, 1)))
+
+    if hidden_count > 0:
+        console.print(
+            f"[dim]+{hidden_count} model{'s' if hidden_count != 1 else ''} hidden "
+            f"(rated \"no\" — insufficient hardware). "
+            f"Run with [bold]--min-rating no[/bold] to show all.[/dim]"
+        )
 
 
 @app.command()
@@ -251,6 +374,8 @@ def search(
     query: str = typer.Argument(..., help="Search query for Hugging Face GGUF models."),
     limit: int = typer.Option(20, help="Maximum number of results."),
     json_output: bool = typer.Option(False, "--json", help="Print results as JSON."),
+    min_params: float | None = typer.Option(None, "--min-params", help="Minimum parameter count in billions (e.g. 7)."),
+    max_params: float | None = typer.Option(None, "--max-params", help="Maximum parameter count in billions (e.g. 70)."),
 ) -> None:
     """Search Hugging Face for GGUF models."""
     if not 1 <= limit <= 100:
@@ -260,6 +385,22 @@ def search(
     except HuggingFaceError as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(1) from None
+
+    # Filter by parameter count when --min-params or --max-params is given.
+    # Models whose param count cannot be inferred from the name are excluded
+    # when any param filter is active (to avoid showing unknown-size models).
+    if min_params is not None or max_params is not None:
+        filtered_results = []
+        for r in results:
+            params = infer_params_from_name(r.repo_id)
+            if params is None:
+                continue  # exclude models with no inferable param count
+            if min_params is not None and params < min_params:
+                continue
+            if max_params is not None and params > max_params:
+                continue
+            filtered_results.append(r)
+        results = filtered_results
 
     if json_output:
         data = [
@@ -302,6 +443,7 @@ def add_model(
     family: str = typer.Option("Unknown", "--family", help="Model family name."),
     notes: str = typer.Option("", "--notes", help="Optional notes for this model."),
     force: bool = typer.Option(False, "--force", help="Overwrite if model ID already exists in user catalog."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview computed entry without saving to catalog."),
     json_output: bool = typer.Option(False, "--json", help="Print added entry as JSON."),
 ) -> None:
     """Add a model to your local catalog with auto-computed VRAM requirements."""
@@ -323,26 +465,40 @@ def add_model(
 
         # Try to infer quant from the first GGUF file if not provided
         if quant is None:
+            detected_quant_file: str | None = None
             for f in files:
                 parsed = parse_gguf_filename(f.filename)
                 if parsed:
                     quant = parsed[1]
-                    console.print(f"[dim]Auto-detected quant: {quant}[/dim]")
+                    detected_quant_file = f.filename
                     break
             if quant is None:
-                console.print("[yellow]Could not detect quant from filenames. Please specify --quant.[/yellow]")
+                console.print(
+                    "[bold red]Error:[/bold red] Could not detect quantization type from any GGUF filename in "
+                    f"'{escape(model_spec)}'. Pass [bold]--quant Q4_K_M[/bold] (or your preferred quant) manually."
+                )
                 raise typer.Exit(1)
+            console.print(
+                f"[yellow]Auto-detected quant:[/yellow] [bold]{quant}[/bold] "
+                f"[dim](from {escape(detected_quant_file or '')})[/dim] — "
+                "use [bold]--quant[/bold] to override if incorrect."
+            )
 
         # Try to infer params from repo name if not provided
         if params_b is None:
             from .huggingface import infer_params_from_name
 
             params_b = infer_params_from_name(model_spec)
-            if params_b is not None:
-                console.print(f"[dim]Auto-detected params: {params_b}B[/dim]")
-            else:
-                console.print("[yellow]Could not detect param count. Please specify --params-b.[/yellow]")
+            if params_b is None:
+                console.print(
+                    f"[bold red]Error:[/bold red] Could not detect parameter count from '{escape(model_spec)}'. "
+                    "Pass [bold]--params-b N[/bold] manually (e.g. --params-b 7)."
+                )
                 raise typer.Exit(1)
+            console.print(
+                f"[yellow]Auto-detected params:[/yellow] [bold]{params_b}B[/bold] — "
+                "use [bold]--params-b[/bold] to override if incorrect."
+            )
 
         model_id = model_spec.split("/")[-1].lower()
 
@@ -363,6 +519,25 @@ def add_model(
         raise typer.Exit(1) from None
 
     entry = build_model_entry(id=model_id, family=family, params_b=params_b, quant=quant, notes=notes)
+
+    if dry_run:
+        if json_output:
+            console.print_json(json.dumps(entry, indent=2))
+            return
+        console.print(
+            Panel(
+                f"[bold]ID[/bold]               {escape(entry['id'])}\n"
+                f"[bold]Family[/bold]           {escape(entry['family'])}\n"
+                f"[bold]Params[/bold]           {entry['params_b']}B\n"
+                f"[bold]Quant[/bold]            {escape(entry['quant'])}\n"
+                f"[bold]Min VRAM[/bold]         {entry['min_vram_gb']} GB\n"
+                f"[bold]Recommended VRAM[/bold] {entry['recommended_vram_gb']} GB\n"
+                f"[bold]Recommended RAM[/bold]  {entry['recommended_ram_gb']} GB",
+                title="[yellow]Dry run — preview only, not saved[/yellow]",
+                border_style="yellow",
+            )
+        )
+        return
 
     # Load existing user catalog and check for duplicates
     user_entries = load_user_catalog()
@@ -397,6 +572,204 @@ def add_model(
             border_style="green",
         )
     )
+
+
+_DOCTOR_TOOLS = ["nvidia-smi", "rocm-smi", "xpu-smi", "sysctl", "wmic", "clinfo"]
+
+_REMOTE_CATALOG_URL = "https://raw.githubusercontent.com/adityaarakeri/llmscan/main/llmscan/models.json"
+_REMOTE_CATALOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+catalog_app = typer.Typer(help="Manage the model catalog.", invoke_without_command=True, no_args_is_help=True)
+app.add_typer(catalog_app, name="catalog")
+
+
+def _fetch_remote_catalog(url: str) -> list[dict]:
+    import httpx
+
+    from .catalog import CatalogValidationError, validate_catalog
+
+    try:
+        resp = httpx.get(url, timeout=15.0, follow_redirects=True)
+        resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        console.print(f"[bold red]Error:[/bold red] Failed to fetch remote catalog: {exc}")
+        raise typer.Exit(1) from None
+
+    raw = resp.content
+    if len(raw) > _REMOTE_CATALOG_MAX_BYTES:
+        console.print(f"[bold red]Error:[/bold red] Remote catalog response too large ({len(raw)} bytes).")
+        raise typer.Exit(1)
+
+    try:
+        entries = resp.json()
+        if not isinstance(entries, list):
+            raise ValueError("Expected a JSON array")
+    except Exception:
+        console.print("[bold red]Error:[/bold red] Invalid JSON in remote catalog response.")
+        raise typer.Exit(1) from None
+
+    try:
+        validate_catalog(entries)
+    except CatalogValidationError as exc:
+        console.print(f"[bold red]Error:[/bold red] Remote catalog failed validation: {exc}")
+        raise typer.Exit(1) from None
+
+    return entries
+
+
+def _compute_diff(
+    remote: list[dict], bundled: list[dict]
+) -> tuple[list[str], list[str], list[str]]:
+    """Return (new_ids, updated_ids, removed_ids) comparing remote against bundled catalog."""
+    bundled_by_id = {m["id"]: m for m in bundled}
+    remote_ids = {m["id"] for m in remote}
+    new_ids: list[str] = []
+    updated_ids: list[str] = []
+    for entry in remote:
+        mid = entry["id"]
+        if mid not in bundled_by_id:
+            new_ids.append(mid)
+        elif entry != bundled_by_id[mid]:
+            updated_ids.append(mid)
+    removed_ids = [mid for mid in bundled_by_id if mid not in remote_ids]
+    return new_ids, updated_ids, removed_ids
+
+
+@catalog_app.command("update")
+def catalog_update(
+    url: str = typer.Option(_REMOTE_CATALOG_URL, "--url", help="URL of the remote catalog JSON."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview changes without saving."),
+    json_output: bool = typer.Option(False, "--json", help="Print diff as JSON."),
+) -> None:
+    """Fetch a remote catalog and merge new/updated models into the local catalog."""
+    from .catalog import DEFAULT_MODELS
+
+    remote = _fetch_remote_catalog(url)
+    new_ids, updated_ids, removed_ids = _compute_diff(remote, DEFAULT_MODELS)
+
+    if json_output:
+        if not dry_run:
+            user_entries = load_user_catalog()
+            _apply_catalog_update(remote, user_entries)
+        console.print_json(
+            json.dumps({"new": new_ids, "updated": updated_ids, "removed": removed_ids, "dry_run": dry_run}, indent=2)
+        )
+        return
+
+    # Build diff table
+    if not new_ids and not updated_ids and not removed_ids:
+        console.print("[green]Catalog is already up to date — no changes.[/green]")
+        return
+
+    table = Table(box=box.SIMPLE_HEAVY, header_style="bold", title="Catalog Diff")
+    table.add_column("Model ID", style="bold white")
+    table.add_column("Change", justify="center")
+    for mid in new_ids:
+        table.add_row(escape(mid), "[bold green]new[/bold green]")
+    for mid in updated_ids:
+        table.add_row(escape(mid), "[bold cyan]updated[/bold cyan]")
+    for mid in removed_ids:
+        table.add_row(escape(mid), "[bold red]removed[/bold red]")
+    console.print(Panel(table, border_style="cyan", padding=(0, 1)))
+
+    if dry_run:
+        console.print(
+            f"[yellow]Dry run — {len(new_ids)} new, {len(updated_ids)} updated, "
+            f"{len(removed_ids)} removed. No changes saved.[/yellow]"
+        )
+        return
+
+    user_entries = load_user_catalog()
+    _apply_catalog_update(remote, user_entries)
+    console.print(
+        f"[green]Catalog updated and saved — {len(new_ids)} new, {len(updated_ids)} updated, "
+        f"{len(removed_ids)} removed from bundled catalog.[/green]"
+    )
+
+
+def _apply_catalog_update(remote: list[dict], user_entries: list[dict]) -> None:
+    """Merge remote entries into the user catalog and save."""
+    merged: dict[str, dict] = {m["id"]: dict(m) for m in user_entries}
+    for entry in remote:
+        merged[entry["id"]] = dict(entry)
+    save_user_catalog(list(merged.values()))
+
+
+@app.command("doctor")
+def doctor(
+    json_output: bool = typer.Option(False, "--json", help="Print diagnostics as JSON."),
+) -> None:
+    """Check hardware detection method availability and flag anomalies."""
+    import shutil
+
+    tool_results: dict[str, dict] = {}
+    for tool in _DOCTOR_TOOLS:
+        path = shutil.which(tool)
+        tool_results[tool] = {"available": path is not None, "path": path}
+
+    profile = _get_profile()
+    anomalies: list[str] = []
+    for gpu in profile.gpus:
+        if gpu.vram_gb == 0.0:
+            anomalies.append(f"GPU '{gpu.name}' detected via {gpu.source} but VRAM reported as 0 GB — driver or query issue.")
+
+    if json_output:
+        console.print_json(json.dumps({"tools": tool_results, "anomalies": anomalies, "gpus": [g.__dict__ for g in profile.gpus]}, indent=2))
+        return
+
+    table = Table(box=box.SIMPLE_HEAVY, header_style="bold", title="Detection Tools")
+    table.add_column("Tool", style="bold white")
+    table.add_column("Status", justify="center")
+    table.add_column("Path", style="dim")
+    for tool, info in tool_results.items():
+        if info["available"]:
+            status = "[bold green]found[/bold green]"
+        else:
+            status = "[bold red]missing[/bold red]"
+        table.add_row(tool, status, info["path"] or "—")
+    console.print(Panel(table, title="[bold]llmscan doctor[/bold]", border_style="cyan", padding=(0, 1)))
+
+    if not profile.gpus:
+        console.print("[yellow]No dedicated GPU detected — scoring based on CPU-only inference.[/yellow]")
+    else:
+        for gpu in profile.gpus:
+            console.print(f"• {gpu.vendor} {gpu.name} — {gpu.vram_gb} GB [dim]({gpu.source})[/dim]")
+
+    if anomalies:
+        for a in anomalies:
+            console.print(Panel(f"[bold yellow]Anomaly:[/bold yellow] {escape(a)}", border_style="yellow"))
+    else:
+        console.print("[green]No anomalies detected.[/green]")
+
+
+_PYPI_URL = "https://pypi.org/pypi/llmscan/json"
+
+
+@app.command("version")
+def version_command(
+    check: bool = typer.Option(False, "--check", help="Check PyPI for the latest available version."),
+) -> None:
+    """Show the installed llmscan version and optionally check for updates."""
+    console.print(f"llmscan [bold]{__version__}[/bold]")
+    if not check:
+        return
+    import httpx
+
+    try:
+        resp = httpx.get(_PYPI_URL, timeout=2.0)
+        resp.raise_for_status()
+        latest = resp.json()["info"]["version"]
+    except Exception:
+        console.print("[yellow]Could not reach PyPI to check for updates.[/yellow]")
+        return
+
+    if latest == __version__:
+        console.print(f"[green]You are up to date.[/green] (latest: {latest})")
+    else:
+        console.print(
+            f"[yellow]Update available:[/yellow] {__version__} → [bold]{latest}[/bold]\n"
+            f"  [dim]pip install --upgrade llmscan[/dim]"
+        )
 
 
 @app.command("remove")

@@ -202,21 +202,27 @@ class TestLoadUserCatalog:
         assert len(result) == 1
         assert result[0]["id"] == "user-custom-7b"
 
-    def test_raises_system_exit_on_invalid_json(self, tmp_path, monkeypatch):
+    def test_returns_empty_and_warns_on_invalid_json(self, tmp_path, monkeypatch, capsys):
         path = tmp_path / "catalog.json"
         path.write_text("{bad json", encoding="utf-8")
         monkeypatch.setattr("llmscan.catalog.user_catalog_path", lambda: path)
-        with pytest.raises(SystemExit, match="invalid JSON"):
-            load_user_catalog()
+        result = load_user_catalog()
+        assert result == []
+        captured = capsys.readouterr()
+        assert "invalid JSON" in captured.err
+        assert "Skipping user catalog" in captured.err
 
-    def test_raises_system_exit_on_missing_fields(self, tmp_path, monkeypatch):
+    def test_returns_empty_and_warns_on_missing_fields(self, tmp_path, monkeypatch, capsys):
         import json
 
         path = tmp_path / "catalog.json"
         path.write_text(json.dumps([{"id": "incomplete"}]), encoding="utf-8")
         monkeypatch.setattr("llmscan.catalog.user_catalog_path", lambda: path)
-        with pytest.raises(SystemExit, match="invalid user catalog"):
-            load_user_catalog()
+        result = load_user_catalog()
+        assert result == []
+        captured = capsys.readouterr()
+        assert "failed validation" in captured.err
+        assert "Skipping user catalog" in captured.err
 
 
 class TestSaveUserCatalog:

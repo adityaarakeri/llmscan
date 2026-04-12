@@ -281,3 +281,105 @@ class TestRemoveCommand:
         assert result.exit_code != 0
         assert "not found" in result.output
         assert "Bundled" in result.output or "bundled" in result.output or "llmscan add" in result.output
+
+
+# ---------------------------------------------------------------------------
+# WSL2 warning display
+# ---------------------------------------------------------------------------
+
+WSL2_PROFILE = MachineProfile(
+    os="Linux",
+    arch="x86_64",
+    cpu="Test CPU",
+    ram_gb=32,
+    gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3080", vram_gb=10.0, source="nvidia-smi")],
+    is_wsl2=True,
+)
+
+
+class TestWsl2Warning:
+    def test_scan_shows_wsl2_warning(self):
+        with patch.object(cli_module, "_get_profile", return_value=WSL2_PROFILE):
+            result = runner.invoke(app, ["scan"])
+        assert result.exit_code == 0
+        assert "WSL2" in result.output
+        assert "inaccurate" in result.output.lower() or "warning" in result.output.lower()
+
+    def test_default_invocation_shows_wsl2_warning(self):
+        with patch.object(cli_module, "_get_profile", return_value=WSL2_PROFILE):
+            result = runner.invoke(app, [])
+        assert result.exit_code == 0
+        assert "WSL2" in result.output
+
+    def test_no_wsl2_warning_on_normal_profile(self):
+        result = runner.invoke(app, ["scan"])
+        assert result.exit_code == 0
+        assert "WSL2" not in result.output
+
+    def test_scan_json_includes_is_wsl2(self):
+        with patch.object(cli_module, "_get_profile", return_value=WSL2_PROFILE):
+            result = runner.invoke(app, ["scan", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["is_wsl2"] is True
+
+
+# ---------------------------------------------------------------------------
+# HF auto-detection validation improvements
+# ---------------------------------------------------------------------------
+
+from llmscan.huggingface import HFFileInfo  # noqa: E402
+
+
+class TestHfAutoDetectionValidation:
+    """Tests for improved auto-detection messaging in `llmscan add`."""
+
+    def _make_files(self, filenames: list[str]) -> list[HFFileInfo]:
+        return [HFFileInfo(filename=f, size_bytes=1000) for f in filenames]
+
+    def test_auto_detected_quant_shows_source_filename(self, monkeypatch):
+        monkeypatch.setattr("llmscan.cli.get_model_files", lambda r: self._make_files(["model.Q4_K_M.gguf"]))
+        monkeypatch.setattr("llmscan.cli.load_user_catalog", lambda: [])
+        monkeypatch.setattr("llmscan.cli.save_user_catalog", lambda e: None)
+        result = runner.invoke(app, ["add", "TheBloke/Llama-2-7B-GGUF"])
+        assert result.exit_code == 0
+        assert "Auto-detected quant" in result.output
+        assert "model.Q4_K_M.gguf" in result.output
+
+    def test_auto_detected_params_shows_warning(self, monkeypatch):
+        monkeypatch.setattr("llmscan.cli.get_model_files", lambda r: self._make_files(["model.Q4_K_M.gguf"]))
+        monkeypatch.setattr("llmscan.cli.load_user_catalog", lambda: [])
+        monkeypatch.setattr("llmscan.cli.save_user_catalog", lambda e: None)
+        result = runner.invoke(app, ["add", "TheBloke/Llama-2-7B-GGUF"])
+        assert result.exit_code == 0
+        assert "Auto-detected params" in result.output
+        assert "7" in result.output  # detected from "7B" in repo name
+
+    def test_cannot_detect_quant_shows_clear_error(self, monkeypatch):
+        monkeypatch.setattr(
+            "llmscan.cli.get_model_files",
+            lambda r: self._make_files(["model-no-quant-info.gguf"]),
+        )
+        result = runner.invoke(app, ["add", "TheBloke/Llama-2-7B-GGUF"])
+        assert result.exit_code != 0
+        assert "quant" in result.output.lower() or "--quant" in result.output
+
+    def test_cannot_detect_params_shows_clear_error(self, monkeypatch):
+        monkeypatch.setattr(
+            "llmscan.cli.get_model_files",
+            lambda r: self._make_files(["model.Q4_K_M.gguf"]),
+        )
+        # repo name has no param count
+        result = runner.invoke(app, ["add", "TheBloke/NoSizeInName-GGUF"])
+        assert result.exit_code != 0
+        assert "--params-b" in result.output
+
+    def test_auto_detect_override_instructions_present(self, monkeypatch):
+        """The user should be told how to override auto-detected values."""
+        monkeypatch.setattr("llmscan.cli.get_model_files", lambda r: self._make_files(["model.Q4_K_M.gguf"]))
+        monkeypatch.setattr("llmscan.cli.load_user_catalog", lambda: [])
+        monkeypatch.setattr("llmscan.cli.save_user_catalog", lambda e: None)
+        result = runner.invoke(app, ["add", "TheBloke/Llama-2-7B-GGUF"])
+        assert result.exit_code == 0
+        # Should tell user they can override
+        assert "--quant" in result.output or "--params-b" in result.output

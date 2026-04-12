@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -98,11 +99,21 @@ def load_user_catalog() -> list[dict[str, Any]]:
     try:
         entries: list[dict[str, Any]] = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"Error: invalid JSON in user catalog '{path}': {exc.msg} (line {exc.lineno})") from None
+        print(
+            f"Warning: user catalog '{path}' contains invalid JSON "
+            f"({exc.msg}, line {exc.lineno}). Skipping user catalog and falling back to bundled models.",
+            file=sys.stderr,
+        )
+        return []
     try:
         validate_catalog(entries)
     except CatalogValidationError as exc:
-        raise SystemExit(f"Error: invalid user catalog '{path}': {exc}") from None
+        print(
+            f"Warning: user catalog '{path}' failed validation: {exc}. "
+            "Skipping user catalog and falling back to bundled models.",
+            file=sys.stderr,
+        )
+        return []
     return entries
 
 

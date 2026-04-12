@@ -31,11 +31,12 @@ class MachineProfile:
     ram_gb: float
     gpus: list[GPUInfo]
     unified_memory_gb: float | None = None
+    is_wsl2: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["primary_gpu_vram_gb"] = max((g.vram_gb for g in self.gpus), default=0)
-        data["total_gpu_vram_gb"] = round(sum(g.vram_gb for g in self.gpus), 1)
+        data["total_gpu_vram_gb"] = round(sum(g.vram_gb * g.count for g in self.gpus), 1)
         return data
 
 
@@ -254,6 +255,19 @@ def _detect_windows_gpu() -> list[GPUInfo]:
     return []
 
 
+def _detect_wsl2() -> bool:
+    """Return True if running inside WSL2 (Windows Subsystem for Linux 2)."""
+    if platform.system() != "Linux":
+        return False
+    try:
+        from pathlib import Path
+
+        version_text = Path("/proc/version").read_text(encoding="utf-8", errors="replace").lower()
+        return "microsoft" in version_text or "wsl" in version_text
+    except Exception:
+        return False
+
+
 def _detect_cpu() -> str:
     """Return a human-readable CPU model name."""
     cpu = platform.processor() or platform.uname().processor or ""
@@ -280,19 +294,34 @@ def detect_machine() -> MachineProfile:
     arch = platform.machine()
     cpu = _detect_cpu()
     ram_gb = _detect_ram_gb()
+    is_wsl2 = _detect_wsl2()
 
-    gpus = _detect_nvidia()
-    if not gpus:
-        gpus = _detect_amd_rocm()
-    if not gpus:
-        gpus = _detect_intel_gpu()
+    gpus: list[GPUInfo] = []
+    for detect_fn in (_detect_nvidia, _detect_amd_rocm, _detect_intel_gpu):
+        try:
+            result = detect_fn()
+        except Exception as exc:
+            log.debug("GPU detection via %s failed unexpectedly: %s", getattr(detect_fn, "__name__", detect_fn), exc)
+            result = []
+        if result:
+            gpus = result
+            break
 
-    apple_gpus, unified = _detect_apple_silicon()
+    unified: float | None = None
+    try:
+        apple_gpus, unified = _detect_apple_silicon()
+    except Exception as exc:
+        log.debug("Apple Silicon detection failed unexpectedly: %s", exc)
+        apple_gpus = []
     if not gpus and apple_gpus:
         gpus = apple_gpus
 
     if not gpus:
-        gpus = _detect_windows_gpu()
+        try:
+            gpus = _detect_windows_gpu()
+        except Exception as exc:
+            log.debug("Windows GPU detection failed unexpectedly: %s", exc)
+            gpus = []
 
     collapsed: dict[tuple[str, str, float, str], GPUInfo] = {}
     for g in gpus:
@@ -303,7 +332,13 @@ def detect_machine() -> MachineProfile:
             collapsed[key].count += 1
 
     return MachineProfile(
-        os=os_name, arch=arch, cpu=cpu, ram_gb=ram_gb, gpus=list(collapsed.values()), unified_memory_gb=unified
+        os=os_name,
+        arch=arch,
+        cpu=cpu,
+        ram_gb=ram_gb,
+        gpus=list(collapsed.values()),
+        unified_memory_gb=unified,
+        is_wsl2=is_wsl2,
     )
 
 

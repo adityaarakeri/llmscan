@@ -17,7 +17,7 @@ class TestScoreModelRatings:
     """Every branch of _score_model gets a dedicated test."""
 
     def test_great_single_gpu_meets_recommended(self, great_profile, sample_model):
-        rating, notes = _score_model(great_profile, sample_model)
+        rating, _, notes = _score_model(great_profile, sample_model)
         assert rating == "great"
         assert "GPU VRAM meets recommended target" in notes
         assert "System RAM is sufficient" in notes
@@ -30,7 +30,7 @@ class TestScoreModelRatings:
             ram_gb=14,
             gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=6.0, source="nvidia-smi")],
         )
-        rating, notes = _score_model(profile, sample_model)
+        rating, _, notes = _score_model(profile, sample_model)
         assert rating == "ok"
         assert "GPU VRAM clears minimum target" in notes
 
@@ -47,7 +47,7 @@ class TestScoreModelRatings:
                 GPUInfo(vendor="NVIDIA", name="RTX 3060 Ti", vram_gb=6.0, source="nvidia-smi"),
             ],
         )
-        rating, notes = _score_model(profile, sample_model)
+        rating, _, notes = _score_model(profile, sample_model)
         assert rating == "ok"
         assert "Total VRAM across GPUs" in notes
         assert "tensor parallelism" in notes
@@ -66,7 +66,7 @@ class TestScoreModelRatings:
                 GPUInfo(vendor="NVIDIA", name="GTX 1060", vram_gb=3.0, source="nvidia-smi"),
             ],
         )
-        rating, notes = _score_model(profile, sample_model)
+        rating, _, notes = _score_model(profile, sample_model)
         assert rating == "tight"
         assert "Total VRAM across GPUs" in notes
         assert "multi-GPU" in notes
@@ -80,7 +80,7 @@ class TestScoreModelRatings:
             ram_gb=64,
             gpus=[],
         )
-        rating, notes = _score_model(profile, sample_model)
+        rating, _, notes = _score_model(profile, sample_model)
         assert rating == "ok"
         assert "Pure CPU inference" in notes
 
@@ -97,7 +97,7 @@ class TestScoreModelRatings:
             ram_gb=16,
             gpus=[GPUInfo(vendor="NVIDIA", name="GTX 1650", vram_gb=4.0, source="nvidia-smi")],
         )
-        rating, notes = _score_model(profile, sample_model)
+        rating, _, notes = _score_model(profile, sample_model)
         assert rating == "tight"
         assert "offload" in notes.lower() or "slower" in notes.lower()
 
@@ -113,16 +113,16 @@ class TestScoreModelRatings:
             ram_gb=32,
             gpus=[GPUInfo(vendor="NVIDIA", name="GT 1030", vram_gb=2.0, source="nvidia-smi")],
         )
-        rating, notes = _score_model(profile, sample_model)
+        rating, _, _ = _score_model(profile, sample_model)
         assert rating == "tight"
 
     def test_no_insufficient_hardware(self, weak_profile, sample_model):
-        rating, notes = _score_model(weak_profile, sample_model)
+        rating, _, notes = _score_model(weak_profile, sample_model)
         assert rating == "no"
         assert "below practical target" in notes
 
     def test_apple_silicon_note(self, apple_profile, sample_model):
-        rating, notes = _score_model(apple_profile, sample_model)
+        _, _, notes = _score_model(apple_profile, sample_model)
         assert "unified memory heuristics" in notes
 
     def test_boundary_exact_recommended(self, sample_model):
@@ -134,7 +134,7 @@ class TestScoreModelRatings:
             ram_gb=16.0,
             gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3070", vram_gb=8.0, source="nvidia-smi")],
         )
-        rating, _ = _score_model(profile, sample_model)
+        rating, _, _ = _score_model(profile, sample_model)
         assert rating == "great"
 
     def test_boundary_just_below_recommended(self, sample_model):
@@ -146,7 +146,7 @@ class TestScoreModelRatings:
             ram_gb=16.0,
             gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=7.9, source="nvidia-smi")],
         )
-        rating, _ = _score_model(profile, sample_model)
+        rating, _, _ = _score_model(profile, sample_model)
         assert rating == "ok"
 
     def test_boundary_exact_minimum(self, sample_model):
@@ -158,7 +158,7 @@ class TestScoreModelRatings:
             ram_gb=12.0,
             gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=5.5, source="nvidia-smi")],
         )
-        rating, _ = _score_model(profile, sample_model)
+        rating, _, _ = _score_model(profile, sample_model)
         assert rating == "ok"
 
 
@@ -206,6 +206,7 @@ class TestEvaluateModels:
         rows = evaluate_models(great_profile, [sample_model])
         assert "rating" in rows[0]
         assert "fit_notes" in rows[0]
+        assert "reason_code" in rows[0]
         assert rows[0]["rating"] in RATING_ORDER
 
 
