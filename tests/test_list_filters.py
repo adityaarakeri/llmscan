@@ -13,19 +13,54 @@ from llmscan.detector import GPUInfo, MachineProfile
 runner = CliRunner()
 
 STRONG = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=128,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=128,
     gpus=[GPUInfo(vendor="NVIDIA", name="H100", vram_gb=80.0, source="nvidia-smi")],
 )
 
 _MULTI_FAMILY_CATALOG = [
-    {"id": "llama-8b", "family": "Llama", "params_b": 8, "quant": "Q4_K_M",
-     "min_vram_gb": 5.0, "recommended_vram_gb": 6.0, "recommended_ram_gb": 10.0, "notes": ""},
-    {"id": "llama-70b", "family": "Llama", "params_b": 70, "quant": "Q4_K_M",
-     "min_vram_gb": 40.0, "recommended_vram_gb": 50.0, "recommended_ram_gb": 80.0, "notes": ""},
-    {"id": "qwen-7b", "family": "Qwen", "params_b": 7, "quant": "Q4_K_M",
-     "min_vram_gb": 4.5, "recommended_vram_gb": 5.5, "recommended_ram_gb": 9.0, "notes": ""},
-    {"id": "mistral-7b", "family": "Mistral", "params_b": 7, "quant": "Q4_K_M",
-     "min_vram_gb": 4.5, "recommended_vram_gb": 5.5, "recommended_ram_gb": 9.0, "notes": ""},
+    {
+        "id": "llama-8b",
+        "family": "Llama",
+        "params_b": 8,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 5.0,
+        "recommended_vram_gb": 6.0,
+        "recommended_ram_gb": 10.0,
+        "notes": "",
+    },
+    {
+        "id": "llama-70b",
+        "family": "Llama",
+        "params_b": 70,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 40.0,
+        "recommended_vram_gb": 50.0,
+        "recommended_ram_gb": 80.0,
+        "notes": "",
+    },
+    {
+        "id": "qwen-7b",
+        "family": "Qwen",
+        "params_b": 7,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 4.5,
+        "recommended_vram_gb": 5.5,
+        "recommended_ram_gb": 9.0,
+        "notes": "",
+    },
+    {
+        "id": "mistral-7b",
+        "family": "Mistral",
+        "params_b": 7,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 4.5,
+        "recommended_vram_gb": 5.5,
+        "recommended_ram_gb": 9.0,
+        "notes": "",
+    },
 ]
 
 
@@ -37,7 +72,10 @@ def _reset():
 
 
 def _invoke_with_catalog(args, catalog=_MULTI_FAMILY_CATALOG):
-    import json as _json, tempfile, os
+    import json as _json
+    import os
+    import tempfile
+
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         _json.dump(catalog, f)
         name = f.name
@@ -52,6 +90,7 @@ def _invoke_with_catalog(args, catalog=_MULTI_FAMILY_CATALOG):
 # ---------------------------------------------------------------------------
 # --family filter
 # ---------------------------------------------------------------------------
+
 
 class TestFamilyFilter:
     def test_family_flag_is_accepted(self):
@@ -116,6 +155,7 @@ class TestFamilyFilter:
 # --sort option
 # ---------------------------------------------------------------------------
 
+
 class TestSortOption:
     def test_sort_params_accepted(self):
         """--sort params is accepted without error."""
@@ -172,5 +212,6 @@ class TestSortOption:
         assert result.exit_code == 0
         data = json.loads(result.output)
         from llmscan.estimator import RATING_ORDER
+
         scores = [RATING_ORDER[m["rating"]] for m in data["models"]]
         assert scores == sorted(scores, reverse=True)

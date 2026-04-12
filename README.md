@@ -322,7 +322,23 @@ cd llmscan
 
 # Install with dev dependencies
 uv pip install -e ".[test,dev]"
+```
 
+Run all CI checks locally with `make`:
+
+```bash
+make          # lint + typecheck + test (same as make ci)
+make lint     # ruff check + format check
+make format   # auto-format with ruff
+make typecheck  # mypy
+make test     # pytest
+```
+
+Override the Python version with `make PYTHON=3.10 ci`.
+
+Or run the individual commands directly:
+
+```bash
 # Run tests
 uv run pytest
 

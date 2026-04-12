@@ -29,37 +29,58 @@ _MODEL = {
 }
 
 GREAT_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=32,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=32,
     gpus=[GPUInfo(vendor="NVIDIA", name="RTX 4090", vram_gb=24.0, source="nvidia-smi")],
 )
 OK_SINGLE_GPU_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i7", ram_gb=14,
+    os="Linux",
+    arch="x86_64",
+    cpu="i7",
+    ram_gb=14,
     gpus=[GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=6.0, source="nvidia-smi")],
 )
 OK_MULTI_GPU_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Xeon", ram_gb=32,
+    os="Linux",
+    arch="x86_64",
+    cpu="Xeon",
+    ram_gb=32,
     gpus=[
         GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=6.0, source="nvidia-smi"),
         GPUInfo(vendor="NVIDIA", name="RTX 3060 Ti", vram_gb=6.0, source="nvidia-smi"),
     ],
 )
 OK_CPU_ONLY_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=64,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=64,
     gpus=[],
 )
 TIGHT_PARTIAL_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i7", ram_gb=16,
+    os="Linux",
+    arch="x86_64",
+    cpu="i7",
+    ram_gb=16,
     gpus=[GPUInfo(vendor="NVIDIA", name="GTX 1650", vram_gb=4.0, source="nvidia-smi")],
 )
 TIGHT_MULTI_GPU_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Xeon", ram_gb=16,
+    os="Linux",
+    arch="x86_64",
+    cpu="Xeon",
+    ram_gb=16,
     gpus=[
         GPUInfo(vendor="NVIDIA", name="GTX 1060", vram_gb=3.0, source="nvidia-smi"),
         GPUInfo(vendor="NVIDIA", name="GTX 1060", vram_gb=3.0, source="nvidia-smi"),
     ],
 )
 NO_PROFILE = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Celeron", ram_gb=4,
+    os="Linux",
+    arch="x86_64",
+    cpu="Celeron",
+    ram_gb=4,
     gpus=[GPUInfo(vendor="NVIDIA", name="GT 730", vram_gb=1.0, source="nvidia-smi")],
 )
 
@@ -67,6 +88,7 @@ NO_PROFILE = MachineProfile(
 # ---------------------------------------------------------------------------
 # _score_model returns a 3-tuple: (rating, reason_code, fit_notes)
 # ---------------------------------------------------------------------------
+
 
 class TestScoreModelReturnsReasonCode:
     def test_returns_three_values(self):
@@ -127,6 +149,7 @@ class TestScoreModelReturnsReasonCode:
 # evaluate_models includes reason_code in each row dict
 # ---------------------------------------------------------------------------
 
+
 class TestEvaluateModelsReasonCode:
     def test_rows_include_reason_code_key(self):
         rows = evaluate_models(GREAT_PROFILE, [_MODEL])
@@ -147,6 +170,7 @@ class TestEvaluateModelsReasonCode:
 # ---------------------------------------------------------------------------
 # list command renders reason codes in the Fit column
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _reset_cache():

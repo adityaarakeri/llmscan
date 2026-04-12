@@ -17,15 +17,34 @@ from llmscan.detector import GPUInfo, MachineProfile
 runner = CliRunner()
 
 STRONG = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=128,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=128,
     gpus=[GPUInfo(vendor="NVIDIA", name="H100", vram_gb=80.0, source="nvidia-smi")],
 )
 
 _CATALOG = [
-    {"id": "model-a-7b", "family": "Alpha", "params_b": 7, "quant": "Q4_K_M",
-     "min_vram_gb": 4.5, "recommended_vram_gb": 5.5, "recommended_ram_gb": 9.0, "notes": ""},
-    {"id": "model-b-13b", "family": "Beta", "params_b": 13, "quant": "Q4_K_M",
-     "min_vram_gb": 8.0, "recommended_vram_gb": 10.0, "recommended_ram_gb": 16.0, "notes": ""},
+    {
+        "id": "model-a-7b",
+        "family": "Alpha",
+        "params_b": 7,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 4.5,
+        "recommended_vram_gb": 5.5,
+        "recommended_ram_gb": 9.0,
+        "notes": "",
+    },
+    {
+        "id": "model-b-13b",
+        "family": "Beta",
+        "params_b": 13,
+        "quant": "Q4_K_M",
+        "min_vram_gb": 8.0,
+        "recommended_vram_gb": 10.0,
+        "recommended_ram_gb": 16.0,
+        "notes": "",
+    },
 ]
 
 

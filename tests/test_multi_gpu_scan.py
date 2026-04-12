@@ -13,14 +13,20 @@ from llmscan.detector import GPUInfo, MachineProfile
 runner = CliRunner()
 
 DUAL_GPU = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Xeon", ram_gb=128,
+    os="Linux",
+    arch="x86_64",
+    cpu="Xeon",
+    ram_gb=128,
     gpus=[
         GPUInfo(vendor="NVIDIA", name="RTX 3090", vram_gb=24.0, count=2, source="nvidia-smi"),
     ],
 )
 
 MIXED_GPU = MachineProfile(
-    os="Linux", arch="x86_64", cpu="Xeon", ram_gb=128,
+    os="Linux",
+    arch="x86_64",
+    cpu="Xeon",
+    ram_gb=128,
     gpus=[
         GPUInfo(vendor="NVIDIA", name="RTX 4090", vram_gb=24.0, count=1, source="nvidia-smi"),
         GPUInfo(vendor="NVIDIA", name="RTX 3060", vram_gb=12.0, count=1, source="nvidia-smi"),
@@ -28,7 +34,10 @@ MIXED_GPU = MachineProfile(
 )
 
 SINGLE_GPU = MachineProfile(
-    os="Linux", arch="x86_64", cpu="i9", ram_gb=32,
+    os="Linux",
+    arch="x86_64",
+    cpu="i9",
+    ram_gb=32,
     gpus=[GPUInfo(vendor="NVIDIA", name="RTX 4090", vram_gb=24.0, source="nvidia-smi")],
 )
 

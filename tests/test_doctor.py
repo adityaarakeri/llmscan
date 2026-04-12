@@ -61,6 +61,7 @@ class TestDoctorCommand:
 
     def test_doctor_marks_available_tool_as_found(self):
         """When nvidia-smi is on PATH, doctor marks it as found."""
+
         def which_side(cmd):
             return "/usr/bin/nvidia-smi" if cmd == "nvidia-smi" else None
 
@@ -93,9 +94,7 @@ class TestDoctorCommand:
         # Should mention VRAM issue or anomaly
         assert "0" in result.output
         assert (
-            "anomaly" in result.output.lower()
-            or "warning" in result.output.lower()
-            or "vram" in result.output.lower()
+            "anomaly" in result.output.lower() or "warning" in result.output.lower() or "vram" in result.output.lower()
         )
 
     def test_doctor_no_anomaly_for_healthy_gpu(self):
@@ -110,7 +109,8 @@ class TestDoctorCommand:
         with patch.object(cli_module, "_get_profile", return_value=FAKE_PROFILE_NO_GPU):
             result = runner.invoke(app, ["doctor"])
         assert result.exit_code == 0
-        assert "no gpu" in result.output.lower() or "no dedicated gpu" in result.output.lower() or "cpu-only" in result.output.lower()
+        out = result.output.lower()
+        assert "no gpu" in out or "no dedicated gpu" in out or "cpu-only" in out
 
     def test_doctor_json_output_contains_tools_key(self):
         """Doctor --json output has a 'tools' key listing each tool's availability."""

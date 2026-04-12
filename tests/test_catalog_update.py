@@ -42,9 +42,8 @@ def _make_httpx_response(data: list, status: int = 200) -> MagicMock:
     mock.raise_for_status = MagicMock()
     if status >= 400:
         import httpx
-        mock.raise_for_status.side_effect = httpx.HTTPStatusError(
-            f"HTTP {status}", request=MagicMock(), response=mock
-        )
+
+        mock.raise_for_status.side_effect = httpx.HTTPStatusError(f"HTTP {status}", request=MagicMock(), response=mock)
     return mock
 
 
@@ -85,7 +84,8 @@ class TestCatalogUpdateDryRun:
             result = runner.invoke(app, ["catalog", "update", "--dry-run"])
 
         assert result.exit_code == 0
-        assert "dry" in result.output.lower() or "preview" in result.output.lower() or "not saved" in result.output.lower()
+        out = result.output.lower()
+        assert "dry" in out or "preview" in out or "not saved" in out
 
 
 class TestCatalogUpdateApply:
@@ -112,7 +112,8 @@ class TestCatalogUpdateApply:
             result = runner.invoke(app, ["catalog", "update"])
 
         assert result.exit_code == 0
-        assert "saved" in result.output.lower() or "updated" in result.output.lower() or "applied" in result.output.lower()
+        out = result.output.lower()
+        assert "saved" in out or "updated" in out or "applied" in out
 
     def test_apply_preserves_user_custom_models(self, monkeypatch):
         """User-added models not in the remote catalog are kept after update."""
@@ -212,7 +213,8 @@ class TestCatalogUpdateErrors:
             result = runner.invoke(app, ["catalog", "update"])
 
         assert result.exit_code != 0
-        assert "invalid" in result.output.lower() or "error" in result.output.lower() or "missing" in result.output.lower()
+        out = result.output.lower()
+        assert "invalid" in out or "error" in out or "missing" in out
 
     def test_custom_url_is_used(self, monkeypatch):
         """--url flag overrides the default remote URL."""
