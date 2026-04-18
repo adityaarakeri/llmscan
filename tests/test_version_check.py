@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
@@ -8,6 +9,12 @@ from llmscan import __version__
 from llmscan.cli import app
 
 runner = CliRunner()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _plain(text: str) -> str:
+    return _ANSI_RE.sub("", text)
 
 
 def _mock_pypi(version: str, status: int = 200):
@@ -32,7 +39,7 @@ class TestVersionCommandExists:
     def test_version_check_flag_exists(self):
         """'llmscan version --help' lists the --check flag."""
         result = runner.invoke(app, ["version", "--help"])
-        assert "--check" in result.output
+        assert "--check" in _plain(result.output)
 
 
 class TestVersionCheckUpToDate:

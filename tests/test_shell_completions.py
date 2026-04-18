@@ -1,22 +1,30 @@
 from __future__ import annotations
 
+import re
+
 from typer.testing import CliRunner
 
 from llmscan.cli import app
 
 runner = CliRunner()
 
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _plain(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
 
 class TestCompletionFlagsExist:
     def test_install_completion_option_appears_in_help(self):
         """--install-completion is listed in the top-level --help output."""
         result = runner.invoke(app, ["--help"])
-        assert "--install-completion" in result.output
+        assert "--install-completion" in _plain(result.output)
 
     def test_show_completion_option_appears_in_help(self):
         """--show-completion is listed in the top-level --help output."""
         result = runner.invoke(app, ["--help"])
-        assert "--show-completion" in result.output
+        assert "--show-completion" in _plain(result.output)
 
 
 class TestShowCompletion:
