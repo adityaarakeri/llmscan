@@ -3,7 +3,9 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
+from pathlib import Path
 
 import typer
 from rich import box
@@ -47,8 +49,75 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+_COMPLETION_SCRIPTS = {
+    "bash": """# llmscan bash completion
+_llmscan_completion() {
+    COMPREPLY=($(compgen -W "scan list explain search add doctor" -- "${COMP_WORDS[COMP_CWORD]}"))
+}
+complete -F _llmscan_completion llmscan
+complete -F _llmscan_completion llmc
+""",
+    "zsh": """#compdef llmscan llmc
+_llmscan_completion() {
+    local -a commands
+    commands=(
+        'scan:Inspect the local machine'
+        'list:List models and fit ratings'
+        'explain:Explain model fit'
+        'search:Search GGUF models'
+        'add:Add a custom catalog entry'
+        'doctor:Run environment checks'
+    )
+    _describe 'command' commands
+}
+compdef _llmscan_completion llmscan
+compdef _llmscan_completion llmc
+""",
+    "fish": """# llmscan fish completion
+complete -c llmscan -f -a "scan list explain search add doctor"
+complete -c llmc -f -a "scan list explain search add doctor"
+""",
+}
+
+
+def _completion_callback(value: str | None) -> None:
+    if value is None:
+        return
+    script = _COMPLETION_SCRIPTS.get(value.lower())
+    if script is None:
+        raise typer.BadParameter("Shell must be one of: bash, zsh, fish.")
+    typer.echo(script, nl=False)
+    raise typer.Exit(code=0)
+
+
+def _completion_install_path(shell: str) -> Path:
+    home = Path.home()
+    if shell == "bash":
+        return home / ".local" / "share" / "bash-completion" / "completions" / "llmscan"
+    if shell == "zsh":
+        return home / ".zfunc" / "_llmscan"
+    return home / ".config" / "fish" / "completions" / "llmscan.fish"
+
+
+def _install_completion_callback(value: str | None) -> None:
+    if value is None:
+        return
+    shell = value.lower()
+    script = _COMPLETION_SCRIPTS.get(shell)
+    if script is None:
+        raise typer.BadParameter("Shell must be one of: bash, zsh, fish.")
+    target = _completion_install_path(shell)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(script, encoding="utf-8")
+    if shell == "zsh" and str(target.parent) not in os.environ.get("FPATH", "").split(":"):
+        typer.echo(f"Installed completion to {target}. Add {target.parent} to FPATH if needed.")
+    else:
+        typer.echo(f"Installed completion to {target}")
+    raise typer.Exit(code=0)
+
+
 app = typer.Typer(
-    add_completion=True, no_args_is_help=False, help="Fast local LLM compatibility checker.", rich_markup_mode="rich"
+    add_completion=False, no_args_is_help=False, help="Fast local LLM compatibility checker.", rich_markup_mode="rich"
 )
 console = Console()
 
@@ -138,14 +207,33 @@ def main(
     version: bool = typer.Option(
         False, "--version", "-V", callback=_version_callback, is_eager=True, help="Show version and exit."
     ),
+    install_completion: str | None = typer.Option(
+        None,
+        "--install-completion",
+        callback=_install_completion_callback,
+        is_eager=True,
+        help="Install shell completion for bash, zsh, or fish.",
+    ),
+    show_completion: str | None = typer.Option(
+        None,
+        "--show-completion",
+        callback=_completion_callback,
+        is_eager=True,
+        help="Print shell completion for bash, zsh, or fish.",
+    ),
     no_color: bool = typer.Option(
         False, "--no-color", help="Disable color and Rich formatting (for CI / log capture)."
     ),
     plain: bool = typer.Option(False, "--plain", help="Alias for --no-color."),
 ) -> None:
     global console
-    if no_color or plain:
-        console = Console(no_color=True, highlight=False)
+    force_terminal = getattr(console, "_force_terminal", None)
+    console = Console(
+        no_color=bool(no_color or plain),
+        highlight=not (no_color or plain),
+        force_terminal=force_terminal,
+        color_system=None if (no_color or plain) else "auto",
+    )
     if ctx.invoked_subcommand:
         return
     _render_header()
