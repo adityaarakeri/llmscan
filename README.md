@@ -13,26 +13,26 @@
 
 ## Features
 
-- **Auto-detects your hardware** — OS, CPU, RAM, and GPU memory in seconds
-- **Multi-vendor GPU support** — NVIDIA (`nvidia-smi`), AMD ROCm (`rocm-smi`), Intel Arc (`xpu-smi`/`clinfo`), Apple Silicon (unified memory), Windows (`Get-CimInstance`/`wmic`)
-- **Smart fitness scoring** — Rates every model as `great`, `ok`, `tight`, or `no` with a short reason code (e.g. `ok (cpu-only)`, `ok (vram -25%)`, `tight (multi-gpu)`)
-- **Backend-aware scoring** — `--backend ollama|llama-cpp|mlx` adjusts memory overhead estimates for the actual inference backend you're using
-- **45+ bundled models** — Llama, Qwen, Mistral, Gemma, Phi, DeepSeek, CodeLlama, StarCoder, and more
-- **Hugging Face search** — Find GGUF models on Hugging Face and add them to your local catalog
-- **Auto-computed VRAM** — Adds models with formula-derived memory requirements from parameter count and quantization
-- **IQ quant support** — Full iMatrix quantization family (`IQ1_S` through `IQ4_NL`) with calibrated VRAM estimates
-- **Multi-GPU aware** — Accounts for tensor parallelism across multiple GPUs with per-card breakdown
-- **CPU-only inference** — Recognizes when you have enough RAM to run models without a GPU
-- **Ollama integration** — `--running` cross-references your catalog against what Ollama has loaded
-- **Catalog updates** — Fetch the latest model list from a remote URL without reinstalling; shows a diff of new/updated/removed models
-- **Diagnostics** — `llmscan doctor` checks which detection tools are available and flags anomalies
-- **Filter and sort** — `--family Llama`, `--sort vram`, `--min-rating ok` for focused output
-- **Beautiful terminal UI** — Rich tables, color-coded ratings, ASCII banner
-- **CI-friendly** — `--no-color` / `--plain` strips all ANSI formatting for log capture and pipelines
-- **Custom catalogs** — Bring your own model list as a JSON file
-- **JSON and CSV output** — Pipe results into scripts, dashboards, or spreadsheets with `--json` or `--csv`
-- **Shell completions** — `--install-completion` for bash, zsh, and fish
-- **Version update check** — `llmscan version --check` pings PyPI to notify you of new releases
+- **Auto-detects your hardware** OS, CPU, RAM, and GPU memory in seconds
+- **Multi-vendor GPU support** NVIDIA (`nvidia-smi`), AMD ROCm (`rocm-smi`), Intel Arc (`xpu-smi`/`clinfo`), Apple Silicon (unified memory), Windows (`Get-CimInstance`/`wmic`)
+- **Smart fitness scoring** Rates every model as `great`, `ok`, `tight`, or `no` with a short reason code (e.g. `ok (cpu-only)`, `ok (vram -25%)`, `tight (multi-gpu)`)
+- **Backend-aware scoring** `--backend ollama|llama-cpp|mlx` adjusts memory overhead estimates for the actual inference backend you're using
+- **45+ bundled models** Llama, Qwen, Mistral, Gemma, Phi, DeepSeek, CodeLlama, StarCoder, and more
+- **Hugging Face search** Find GGUF models on Hugging Face and add them to your local catalog
+- **Auto-computed VRAM** Adds models with formula-derived memory requirements from parameter count and quantization
+- **IQ quant support** Full iMatrix quantization family (`IQ1_S` through `IQ4_NL`) with calibrated VRAM estimates
+- **Multi-GPU aware** Accounts for tensor parallelism across multiple GPUs with per-card breakdown
+- **CPU-only inference** Recognizes when you have enough RAM to run models without a GPU
+- **Ollama integration** `--running` cross-references your catalog against what Ollama has loaded
+- **Catalog updates** Fetch the latest model list from a remote URL without reinstalling; shows a diff of new/updated/removed models
+- **Diagnostics** `llmscan doctor` checks which detection tools are available and flags anomalies
+- **Filter and sort** `--family Llama`, `--sort vram`, `--min-rating ok` for focused output
+- **Beautiful terminal UI** Rich tables, color-coded ratings, ASCII banner
+- **CI-friendly** `--no-color` / `--plain` strips all ANSI formatting for log capture and pipelines
+- **Custom catalogs** Bring your own model list as a JSON file
+- **JSON and CSV output** Pipe results into scripts, dashboards, or spreadsheets with `--json` or `--csv`
+- **Shell completions** `--install-completion` for bash, zsh, and fish
+- **Version update check** `llmscan version --check` pings PyPI to notify you of new releases
 
 ## Install
 
@@ -74,14 +74,14 @@ llmscan --plain scan --json
 
 ## Usage
 
-### `scan` — Inspect your hardware
+### `scan` Inspect your hardware
 
 ```bash
 llmscan scan              # Rich formatted hardware details
 llmscan scan --json       # Machine-readable JSON output
 ```
 
-### `list` — List compatible models
+### `list` List compatible models
 
 ```bash
 llmscan list                          # Show models rated "tight" and above
@@ -97,9 +97,9 @@ llmscan list --backend mlx            # Adjust scoring for MLX framework overhea
 llmscan list --csv                    # Output as CSV (pipe to a spreadsheet or script)
 ```
 
-Each row in the table shows a short reason code next to the rating explaining *why* a model received that score — e.g. `ok (cpu-only)`, `ok (vram -25%)`, `tight (multi-gpu)`, `tight (partial offload)`. When models are hidden by the active filter, a summary line at the bottom tells you how many are hidden and how to reveal them.
+Each row in the table shows a short reason code next to the rating explaining *why* a model received that score e.g. `ok (cpu-only)`, `ok (vram -25%)`, `tight (multi-gpu)`, `tight (partial offload)`. When models are hidden by the active filter, a summary line at the bottom tells you how many are hidden and how to reveal them.
 
-### `explain` — Deep-dive on a specific model
+### `explain` Deep-dive on a specific model
 
 ```bash
 llmscan explain llama-3.1-8b-instruct              # Why does this model fit?
@@ -107,7 +107,7 @@ llmscan explain qwen2.5-72b-instruct               # Why doesn't it?
 llmscan explain my-model --catalog my_models.json   # Explain from a custom catalog
 ```
 
-### `search` — Find GGUF models on Hugging Face
+### `search` Find GGUF models on Hugging Face
 
 ```bash
 llmscan search llama                          # Search for Llama GGUF models
@@ -121,7 +121,7 @@ llmscan search llama --min-params 7 --max-params 70  # Parameter range filter
 
 Models without an inferable parameter count in their name are excluded when either `--min-params` or `--max-params` is active.
 
-### `add` — Add a model to your local catalog
+### `add` Add a model to your local catalog
 
 VRAM/RAM requirements are auto-computed from the parameter count and quantization type.
 
@@ -149,13 +149,13 @@ Supported quantization types: `Q2_K`, `Q3_K_S`, `Q3_K_M`, `Q3_K_L`, `Q4_0`, `Q4_
 
 Models are saved to `~/.llmscan/catalog.json` and automatically merged with the bundled catalog. If that file becomes malformed, `llmscan` will print a warning and fall back to the bundled catalog rather than crashing.
 
-### `remove` — Remove a model from your local catalog
+### `remove` Remove a model from your local catalog
 
 ```bash
 llmscan remove my-model   # Only removes user-added models, not bundled ones
 ```
 
-### `doctor` — Diagnose hardware detection
+### `doctor` Diagnose hardware detection
 
 Checks which detection tools are present on your system (`nvidia-smi`, `rocm-smi`, `xpu-smi`, `sysctl`, `wmic`, `clinfo`), reports their paths, and flags anomalies such as a GPU being detected with 0 VRAM reported.
 
@@ -164,7 +164,7 @@ llmscan doctor          # Rich table showing tool availability + any anomalies
 llmscan doctor --json   # Machine-readable JSON
 ```
 
-### `catalog update` — Refresh the model list
+### `catalog update` Refresh the model list
 
 Fetches the latest `models.json` from a remote URL and merges new or updated entries into your local catalog. Your own custom-added models are always preserved.
 
@@ -175,7 +175,7 @@ llmscan catalog update --json                   # JSON diff output
 llmscan catalog update --url https://example.com/catalog.json  # Use a custom URL
 ```
 
-### `version` — Show version and check for updates
+### `version` Show version and check for updates
 
 ```bash
 llmscan version           # Print installed version
@@ -214,23 +214,23 @@ llmscan list --min-rating ok
 ┃ phi-4-mini                   ┃ Phi     ┃ 4B     ┃ ok (vram -22%)   ┃ 2.5 GB   ┃ 3.1 GB   ┃ 6 GB    ┃
 ┃ qwen2.5-7b-instruct          ┃ Qwen    ┃ 7B     ┃ ok (cpu-only)    ┃ 4.4 GB   ┃ 5.5 GB   ┃ 8 GB    ┃
 ...
-+8 models hidden (rated "no" — insufficient hardware). Run with --min-rating no to show all.
++8 models hidden (rated "no" insufficient hardware). Run with --min-rating no to show all.
 ```
 
 ## Rating System
 
 | Rating  | Meaning |
 |---------|---------|
-| `great` | GPU VRAM and RAM both meet recommended targets — best experience |
+| `great` | GPU VRAM and RAM both meet recommended targets best experience |
 | `ok`    | Meets minimum requirements; may need moderate context limits or uses CPU-only inference |
-| `tight` | Runs with CPU offload, reduced context, or multi-GPU splitting — expect slower performance |
+| `tight` | Runs with CPU offload, reduced context, or multi-GPU splitting expect slower performance |
 | `no`    | Hardware is below practical minimums |
 
 Each rating is annotated with a short **reason code** shown in parentheses:
 
 | Reason code | When it appears |
 |-------------|----------------|
-| *(none)* | `great` or `no` — the rating is self-explanatory |
+| *(none)* | `great` or `no` the rating is self-explanatory |
 | `vram -N%` | GPU clears the minimum but is N% below recommended VRAM |
 | `ram low` | GPU meets recommended VRAM but system RAM is the bottleneck |
 | `cpu-only` | No usable GPU; inference runs entirely in system RAM |
@@ -363,4 +363,4 @@ uv run mypy llmscan/
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT see [LICENSE](LICENSE) for details.
