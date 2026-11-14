@@ -146,6 +146,31 @@ def _rating_style(rating: str) -> str:
     return {"great": "bold green", "ok": "bold cyan", "tight": "bold yellow", "no": "bold red"}.get(rating, "white")
 
 
+def _render_headroom_bar(headroom_gb: float, slots_per_side: int = 3) -> Text:
+    """Renders a compact bidirectional +/- VRAM headroom bar with dotted stipple tips."""
+    t = Text(no_wrap=True)
+    if headroom_gb >= 0:
+        fill = min(slots_per_side, max(1, int(round(headroom_gb / 3.0))))
+        t.append("·" * slots_per_side, style="bright_black")
+        t.append("|", style="bold white")
+        bar = "█" * (fill - 1) + "░"
+        empty = "·" * (slots_per_side - fill)
+        t.append(bar, style="bold green")
+        t.append(empty, style="bright_black")
+        t.append(f"+{headroom_gb:.1f}G", style="bold green")
+    else:
+        deficit = abs(headroom_gb)
+        fill = min(slots_per_side, max(1, int(round(deficit / 8.0))))
+        empty = "·" * (slots_per_side - fill)
+        bar = "░" + "█" * (fill - 1)
+        t.append(empty, style="bright_black")
+        t.append(bar, style="bold red")
+        t.append("|", style="bold white")
+        t.append("·" * slots_per_side, style="bright_black")
+        t.append(f"-{deficit:.1f}G", style="bold red")
+    return t
+
+
 def _badge(label: str, value: str, style: str) -> Panel:
     text = Text.assemble((label + "\n", "dim"), (value, style))
     return Panel(Align.center(text), border_style=style, padding=(0, 2))
@@ -329,6 +354,7 @@ def list_models(
         "llama-cpp", "--backend", help="Inference backend for scoring: llama-cpp (default), ollama, mlx."
     ),
     csv_output: bool = typer.Option(False, "--csv", help="Print model results as CSV (spreadsheet-friendly)."),
+    show_notes: bool = typer.Option(False, "--notes", help="Show verbose fit notes column in the table."),
 ) -> None:
     """List compatible models for this machine."""
     min_rating = min_rating.lower()
@@ -397,29 +423,42 @@ def list_models(
     table.add_column("Model", style="bold white")
     table.add_column("Family", style="bright_black")
     table.add_column("Params", justify="right")
-    table.add_column("Fit", justify="center")
-    table.add_column("Min VRAM", justify="right")
-    table.add_column("Rec VRAM", justify="right")
-    table.add_column("Rec RAM", justify="right")
-    table.add_column("Notes", overflow="fold")
+    table.add_column("Fit & Headroom", justify="left")
+    table.add_column("Min VRAM", justify="right", no_wrap=True)
+    table.add_column("Rec VRAM", justify="right", no_wrap=True)
+    table.add_column("Rec RAM", justify="right", no_wrap=True)
+    if show_notes:
+        table.add_column("Notes", overflow="fold")
     if running:
         table.add_column("Running", justify="center")
 
+    best_vram = max((g.vram_gb for g in profile.gpus), default=0.0)
+
     for row in filtered:
         reason = row.get("reason_code", "")
-        fit_cell = f"[{_rating_style(row['rating'])}]{row['rating']}[/]"
+        fit_text = Text()
+        fit_text.append(row["rating"], style=_rating_style(row["rating"]))
         if reason:
-            fit_cell += f" [dim]({escape(reason)})[/dim]"
-        cells = [
+            fit_text.append(f" ({reason})", style="dim")
+
+        # Append bidirectional headroom bar when GPU is detected
+        if best_vram > 0:
+            rec_v = float(row.get("recommended_vram_gb", 0.0))
+            headroom = round(best_vram - rec_v, 1)
+            fit_text.append(" ")
+            fit_text.append_text(_render_headroom_bar(headroom))
+
+        cells: list[str | Text] = [
             escape(row["id"]),
             escape(row["family"]),
             f"{row['params_b']}B",
-            fit_cell,
+            fit_text,
             f"{row['min_vram_gb']} GB",
             f"{row['recommended_vram_gb']} GB",
             f"{row['recommended_ram_gb']} GB",
-            escape(row["fit_notes"]),
         ]
+        if show_notes:
+            cells.append(escape(row["fit_notes"]))
         if running:
             cells.append("[bold green]●[/bold green]" if row.get("running") else "[dim]—[/dim]")
         table.add_row(*cells)
