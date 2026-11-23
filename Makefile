@@ -13,23 +13,23 @@ lint:
 	@echo "================================="
 	@echo "running target: $@"
 	@echo "================================="
-	uv run --python $(PYTHON) --with ruff ruff check .
-	uv run --python $(PYTHON) --with ruff ruff format --check .
+	uv run --python $(PYTHON) ruff check .
+	uv run --python $(PYTHON) ruff format --check .
 
 format:
 	@echo "================================="
 	@echo "running target: $@"
 	@echo "================================="
-	uv run --python $(PYTHON) --with ruff ruff format .
+	uv run --python $(PYTHON) ruff format .
 
 typecheck:
 	@echo "================================="
 	@echo "running target: $@"
 	@echo "================================="
-	uv run --python $(PYTHON) --with mypy mypy llmscan/
+	uv run --python $(PYTHON) mypy llmscan/
 
 test:
 	@echo "================================="
 	@echo "running target: $@"
 	@echo "================================="
-	uv run --python $(PYTHON) --extra test pytest --tb=short -q
+	uv run --python $(PYTHON) pytest --tb=short -q

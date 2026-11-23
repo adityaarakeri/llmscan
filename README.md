@@ -36,23 +36,47 @@
 
 ## Install
 
+The recommended way to install llmscan is with [uv](https://docs.astral.sh/uv/), a fast Python package and project manager.
+
+### 1. Install uv
+
 ```bash
-# With pip
-pip install llmscan
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# With pipx (isolated install)
-pipx install llmscan
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 
-# With uv
-uv pip install llmscan
-
-# From source
-git clone https://github.com/adityaarakeri/llmscan.git
-cd llmscan
-pip install -e .
+# Or via a package manager
+brew install uv        # Homebrew
+pipx install uv        # pipx
 ```
 
-The installed command remains `llmscan`.
+Check it worked with `uv --version`. You don't need to install Python yourself; uv downloads a suitable version when needed.
+
+### 2. Install llmscan
+
+```bash
+# Install as a global command (isolated environment, on your PATH)
+uv tool install llmscan
+llmscan
+
+# Or run it once without installing
+uvx llmscan
+
+# Upgrade / uninstall later
+uv tool upgrade llmscan
+uv tool uninstall llmscan
+```
+
+### Other install methods
+
+```bash
+pip install llmscan      # pip
+pipx install llmscan     # pipx
+```
+
+The installed command is `llmscan` (with `llmc` as a short alias).
 
 ## Demo
 
@@ -319,13 +343,33 @@ llmscan explain my-custom-model-7b --catalog my_models.json
 
 ## Development
 
+The project is managed with [uv](https://docs.astral.sh/uv/) (see [Install uv](#1-install-uv) above). Dependencies are pinned in `uv.lock` and the default Python version is set in `.python-version`.
+
 ```bash
 git clone https://github.com/adityaarakeri/llmscan.git
 cd llmscan
 
-# Install with dev dependencies
-uv pip install -e ".[test,dev]"
+# Create .venv and install llmscan (editable) plus all dev tools (pytest, ruff, mypy)
+uv sync
+
+# Run the CLI from your working copy
+uv run llmscan scan
 ```
+
+`uv run` keeps `.venv` in sync with `uv.lock` automatically, so you rarely need to activate it. If you prefer, run `source .venv/bin/activate` (or `.venv\Scripts\activate` on Windows) and then call `llmscan` directly.
+
+Managing dependencies:
+
+```bash
+uv add "somepkg>=1.0,<2.0"           # add a runtime dependency (keep an upper bound)
+uv add --group test "somepkg>=1,<2"  # add a test-only dependency
+uv remove somepkg                    # remove a dependency
+uv lock --upgrade                    # upgrade locked versions within constraints
+uv sync --python 3.10                # test against a different Python version
+uv build                             # build sdist + wheel into dist/
+```
+
+Always commit `uv.lock` together with `pyproject.toml` changes. CI runs with `--locked` and fails if the lockfile is out of date.
 
 Run all CI checks locally with `make`:
 

@@ -224,7 +224,7 @@ class TestDetectAppleSilicon:
     @patch("llmscan.detector._run")
     def test_apple_m_series_chip(self, mock_run, mock_sys, mock_mach):
         def run_side_effect(cmd):
-            if "brand_string" in cmd:
+            if "machdep.cpu.brand_string" in cmd:
                 return "Apple M2 Max"
             if "hw.memsize" in cmd:
                 return str(32 * 1024**3)  # 32 GB
@@ -244,7 +244,7 @@ class TestDetectAppleSilicon:
     @patch("llmscan.detector._run")
     def test_non_apple_arm64_still_detected(self, mock_run, mock_sys, mock_mach, mock_proc):
         def run_side_effect(cmd):
-            if "brand_string" in cmd:
+            if "machdep.cpu.brand_string" in cmd:
                 return None
             if "hw.memsize" in cmd:
                 return str(16 * 1024**3)

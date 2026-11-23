@@ -37,9 +37,11 @@ Issues = "https://github.com/adityaarakeri/llmscan/issues"
 llmscan = "llmscan.cli:app"
 llmc = "llmscan.cli:app"
 
-[project.optional-dependencies]
+[dependency-groups]
+# Installed automatically by `uv sync` / `uv run` (the "dev" group is uv's default).
 test = ["pytest>=8.0,<9.0", "pyyaml>=6.0,<7.0", "tomli>=2.0,<3.0; python_version < '3.11'"]
-dev = ["ruff>=0.4,<1.0", "mypy>=1.10,<2.0"]
+lint = ["ruff>=0.4,<1.0", "mypy>=1.10,<2.0"]
+dev = [{ include-group = "test" }, { include-group = "lint" }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
