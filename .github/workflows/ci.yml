@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
       - run: uv python install 3.12
-      - run: uv run --python 3.12 --with ruff ruff check .
-      - run: uv run --python 3.12 --with ruff ruff format --check .
+      - run: uv run --locked --python 3.12 ruff check .
+      - run: uv run --locked --python 3.12 ruff format --check .
 
   typecheck:
     runs-on: ubuntu-latest
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
       - run: uv python install 3.12
-      - run: uv run --python 3.12 --with mypy mypy llmscan/
+      - run: uv run --locked --python 3.12 mypy llmscan/
 
   test:
     runs-on: ${{ matrix.os }}
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081 # v5
       - run: uv python install ${{ matrix.python-version }}
-      - run: uv run --python ${{ matrix.python-version }} --extra test pytest --tb=short -q
+      - run: uv run --locked --python ${{ matrix.python-version }} pytest --tb=short -q
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
