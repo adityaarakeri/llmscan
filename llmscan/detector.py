@@ -271,8 +271,8 @@ def _detect_wsl2() -> bool:
 def _detect_cpu() -> str:
     """Return a human-readable CPU model name."""
     cpu = platform.processor() or platform.uname().processor or ""
-    # platform.processor() often returns just the arch string on Linux/WSL
-    if cpu in ("", "unknown", platform.machine()):
+    # platform.processor() often returns just the arch string on Linux/WSL/macOS (e.g. "arm", "i386", "x86_64")
+    if cpu in ("", "unknown", "arm", "i386", platform.machine()):
         if platform.system() == "Linux":
             try:
                 from pathlib import Path
