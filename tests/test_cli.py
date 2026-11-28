@@ -62,6 +62,21 @@ class TestCliSmoke:
         result = runner.invoke(app, [])
         assert result.exit_code == 0
         assert "LLM" in result.output or "██" in result.output  # banner
+        assert "Model Fit Matrix" in result.output
+        assert "id,family,params_b" not in result.output
+
+    def test_gpu_lines_no_duplicate_vendor_prefix(self):
+        profile = MachineProfile(
+            os="Darwin",
+            arch="arm64",
+            cpu="Apple M5 Pro",
+            ram_gb=64.0,
+            gpus=[GPUInfo(vendor="Apple", name="Apple M5 Pro", vram_gb=41.6, source="apple-unified-memory-estimate")],
+            unified_memory_gb=64.0,
+        )
+        lines = cli_module._gpu_lines(profile)
+        assert "Apple M5 Pro" in lines
+        assert "Apple Apple" not in lines
 
     def test_scan(self):
         result = runner.invoke(app, ["scan"])

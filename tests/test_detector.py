@@ -10,6 +10,7 @@ from llmscan.detector import (
     MachineProfile,
     _detect_amd_rocm,
     _detect_apple_silicon,
+    _detect_cpu,
     _detect_intel_gpu,
     _detect_nvidia,
     _detect_ram_gb,
@@ -257,6 +258,13 @@ class TestDetectAppleSilicon:
         gpus, unified = _detect_apple_silicon()
         assert len(gpus) == 1
         assert unified == 16.0
+
+    @patch("llmscan.detector._run", return_value="Apple M5 Pro")
+    @patch("llmscan.detector.platform.machine", return_value="arm64")
+    @patch("llmscan.detector.platform.processor", return_value="arm")
+    @patch("llmscan.detector.platform.system", return_value="Darwin")
+    def test_detect_cpu_uses_sysctl_on_apple_silicon(self, mock_sys, mock_proc, mock_mach, mock_run):
+        assert _detect_cpu() == "Apple M5 Pro"
 
 
 # ---------------------------------------------------------------------------

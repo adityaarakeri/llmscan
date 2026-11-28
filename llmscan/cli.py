@@ -181,7 +181,8 @@ def _gpu_lines(profile: MachineProfile) -> str:
     lines = []
     for gpu in profile.gpus:
         count = f" x{gpu.count}" if gpu.count > 1 else ""
-        lines.append(f"• {gpu.vendor} {gpu.name}{count} — {gpu.vram_gb} GB [dim]({gpu.source})[/dim]")
+        label = gpu.name if gpu.name.lower().startswith(gpu.vendor.lower()) else f"{gpu.vendor} {gpu.name}"
+        lines.append(f"• {label}{count} — {gpu.vram_gb} GB [dim]({gpu.source})[/dim]")
     return "\n".join(lines)
 
 
@@ -249,7 +250,14 @@ def main(
     )
     console.print(Rule(style="bright_black"))
     list_models(
-        min_rating="ok", catalog=None, json_output=False, family=None, sort="rating", running=False, backend="llama-cpp"
+        min_rating="ok",
+        catalog=None,
+        json_output=False,
+        family=None,
+        sort="rating",
+        running=False,
+        backend="llama-cpp",
+        csv_output=False,
     )
     console.print(
         "\n[dim]Try:[/dim]\n"
@@ -843,7 +851,8 @@ def doctor(
         console.print("[yellow]No dedicated GPU detected — scoring based on CPU-only inference.[/yellow]")
     else:
         for gpu in profile.gpus:
-            console.print(f"• {gpu.vendor} {gpu.name} — {gpu.vram_gb} GB [dim]({gpu.source})[/dim]")
+            label = gpu.name if gpu.name.lower().startswith(gpu.vendor.lower()) else f"{gpu.vendor} {gpu.name}"
+            console.print(f"• {label} — {gpu.vram_gb} GB [dim]({gpu.source})[/dim]")
 
     if anomalies:
         for a in anomalies:
